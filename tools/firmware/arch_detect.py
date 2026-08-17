@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from fsa.utils.proc import run_command
+from fsa.utils.traverse import iter_rootfs_files
 
 # Map readelf architecture strings to a canonical name.
 ARCH_MAP: dict[str, str] = {
@@ -72,7 +73,9 @@ def _detect_libc(rootfs: Path) -> str | None:
 def _kernel_hints(rootfs: Path) -> dict[str, Any]:
     """Extract kernel version / vermagic from kernel modules."""
     hints: dict[str, Any] = {"version": None, "vermagic": None}
-    for ko in rootfs.rglob("*.ko"):
+    for ko in iter_rootfs_files(rootfs):
+        if ko.suffix != ".ko":
+            continue
         result = run_command(["modinfo", str(ko)], timeout=10)
         if result.status == "success":
             m = re.search(r"vermagic:\s+(.+)", result.stdout)
@@ -145,9 +148,7 @@ def detect_architecture(rootfs_dir: str | Path, max_samples: int = 20) -> dict[s
 
     use_readelf = shutil.which("readelf") is not None
     samples: list[dict[str, Any]] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
+    for path in iter_rootfs_files(root):
         if path.stat().st_size < 4:
             continue
         with path.open("rb") as fh:

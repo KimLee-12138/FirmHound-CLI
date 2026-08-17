@@ -9,6 +9,7 @@ from fsa.reporting.store_base import RunLayout
 from fsa.safety.policy_engine import PolicyEngine
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import save_json
+from fsa.utils.traverse import iter_rootfs_files
 from tools.firmware.arch_detect import detect_architecture
 from tools.firmware.collect_info import collect_info
 from tools.firmware.rootfs_score import score_rootfs_candidates
@@ -87,7 +88,7 @@ def build_manifest(
     if best_rootfs:
         root = Path(best_rootfs["path"])
         manifest["elf_count"] = sum(
-            1 for p in root.rglob("*") if p.is_file() and p.read_bytes()[:4] == b"\x7fELF"
+            1 for p in iter_rootfs_files(root) if p.read_bytes()[:4] == b"\x7fELF"
         )
 
     validate(manifest, schema_name="firmware_manifest")

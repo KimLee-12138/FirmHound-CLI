@@ -10,6 +10,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from fsa.utils.traverse import iter_rootfs_files
+
 HIGH_IMPACT_ACTIONS = {
     "upgrade",
     "update",
@@ -86,7 +88,9 @@ def find_upnp_xmls(rootfs_dir: str | Path) -> list[Path]:
     """Find likely UPnP service XML files in a rootfs."""
     root = Path(rootfs_dir)
     candidates: list[Path] = []
-    for path in root.rglob("*.xml"):
+    for path in iter_rootfs_files(root):
+        if path.suffix.lower() != ".xml":
+            continue
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:

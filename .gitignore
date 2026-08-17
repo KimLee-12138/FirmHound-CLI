@@ -23,6 +23,7 @@ htmlcov/
 
 # Runtime artifacts
 runs/
+tmp/
 *.log
 *.jsonl
 

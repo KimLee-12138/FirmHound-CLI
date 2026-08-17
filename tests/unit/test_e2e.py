@@ -73,3 +73,30 @@ def test_analyze_missing_rootfs_raises(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError):
         analyze_rootfs(tmp_path / "does-not-exist")
+
+
+def test_analyze_skips_broken_symlinks(tmp_path: Path) -> None:
+    """Rootfs containing Linux-only symlinks must not crash analysis.
+
+    Real firmware (e.g. D-Link DIR-859) ships ``tmp -> /dev/null`` and
+    similar absolute symlinks that Windows cannot stat. Regression for
+    ``OSError: [WinError 1920]`` seen on Windows traversal.
+    """
+    rootfs = _make_rootfs(tmp_path)
+    # Symlink pointing at a Linux absolute path (unresolvable on Windows).
+    try:
+        (rootfs / "tmp").symlink_to("/dev/null", target_is_directory=False)
+    except OSError:
+        # Symlink creation may itself be restricted; use a real file fallback.
+        (rootfs / "tmp").write_text("stub", encoding="utf-8")
+
+    # Also a symlinked directory pointing outside the rootfs.
+    try:
+        (rootfs / "proc").symlink_to("/proc", target_is_directory=True)
+    except OSError:
+        (rootfs / "proc").mkdir(exist_ok=True)
+
+    result = analyze_rootfs(rootfs)
+    assert result["inventory"]["elf_count"] == 1
+    assert result["inventory"]["script_count"] >= 1
+    assert len(result["candidates"]) >= 2

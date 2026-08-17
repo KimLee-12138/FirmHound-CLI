@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from fsa.utils.traverse import iter_rootfs_files
+
 SERVICE_PATTERNS = [
     re.compile(r"^\s*(?:/usr)?/s?bin/(\S+)\s+(.+)$"),
     re.compile(r"^\s*(\S+/\S+)\s+(.+)$"),
@@ -83,9 +85,7 @@ def parse_all_startup(rootfs_dir: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(f"Rootfs not found: {root}")
 
     all_services: list[dict[str, Any]] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
+    for path in iter_rootfs_files(root):
         if _is_startup_path(path):
             all_services.extend(parse_startup_script(path))
 

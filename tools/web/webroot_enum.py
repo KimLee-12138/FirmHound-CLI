@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from fsa.utils.traverse import iter_rootfs_dirs, iter_rootfs_files
+
 ENDPOINT_SUFFIXES = {".cgi", ".asp", ".aspx", ".php", ".lua", ".json", ".xml", ".htm", ".html"}
+WEBROOT_NAMES = {"www", "htdocs", "web", "webroot", "html"}
 FUNCTIONAL_KEYWORDS: dict[str, list[str]] = {
     "auth": ["login", "logout", "auth", "session", "password", "token"],
     "config": ["config", "setting", "setup", "wizard"],
@@ -38,9 +41,7 @@ def enumerate_webroot(webroot_dir: str | Path) -> dict[str, Any]:
     endpoints: list[dict[str, Any]] = []
     static_assets = 0
 
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
+    for path in iter_rootfs_files(root):
         rel = path.relative_to(root)
         route = "/" + "/".join(rel.parts)
         suffix = path.suffix.lower()
@@ -79,10 +80,9 @@ def find_webroots(rootfs_dir: str | Path) -> list[Path]:
     """Find candidate webroot directories inside a rootfs."""
     root = Path(rootfs_dir)
     candidates: list[Path] = []
-    for name in ("www", "htdocs", "web", "html", "webroot"):
-        for found in root.rglob(name):
-            if found.is_dir():
-                candidates.append(found)
+    for path in iter_rootfs_dirs(root):
+        if path.name.lower() in WEBROOT_NAMES:
+            candidates.append(path)
     return candidates
 
 

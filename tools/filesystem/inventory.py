@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from fsa.utils.traverse import iter_rootfs_dirs, iter_rootfs_files
+
 SCRIPT_EXTENSIONS = {".sh", ".lua", ".php", ".py", ".cgi", ".js"}
 CONFIG_DIRS = {"etc", "conf", "config", "configs"}
 WEBROOT_NAMES = {"www", "htdocs", "web", "webroot", "html"}
@@ -14,7 +16,9 @@ def inventory_rootfs(rootfs_dir: str | Path) -> dict[str, Any]:
     """Create a structured inventory of a rootfs.
 
     Returns counts and paths for ELF binaries, scripts, configuration files,
-    webroots, and startup scripts.
+    webroots, and startup scripts. Traversal is symlink-safe: entries that
+    cannot be stat'ed (e.g. symlinks to Linux-only paths on Windows) are
+    skipped rather than aborting the run.
     """
     root = Path(rootfs_dir)
     if not root.exists():
@@ -26,12 +30,7 @@ def inventory_rootfs(rootfs_dir: str | Path) -> dict[str, Any]:
     startup_scripts: list[str] = []
     webroots: list[str] = []
 
-    for path in root.rglob("*"):
-        if not path.is_file():
-            if path.is_dir() and path.name.lower() in WEBROOT_NAMES:
-                webroots.append(path.relative_to(root).as_posix())
-            continue
-
+    for path in iter_rootfs_files(root):
         rel = path.relative_to(root).as_posix()
         try:
             magic = path.read_bytes()[:4]
@@ -49,11 +48,9 @@ def inventory_rootfs(rootfs_dir: str | Path) -> dict[str, Any]:
             startup_scripts.append(rel)
 
     # Also look for webroot directories that may be nested (e.g. usr/www).
-    for candidate in ["www", "htdocs", "web", "html"]:
-        for found in root.rglob(candidate):
-            rel_posix = found.relative_to(root).as_posix()
-            if found.is_dir() and rel_posix not in webroots:
-                webroots.append(rel_posix)
+    for path in iter_rootfs_dirs(root):
+        if path.name.lower() in WEBROOT_NAMES:
+            webroots.append(path.relative_to(root).as_posix())
 
     return {
         "rootfs": str(root.resolve()),

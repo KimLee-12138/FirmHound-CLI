@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from fsa.utils.jsonio import save_json
+from fsa.utils.traverse import iter_rootfs_files
 from tools.analysis.risk_score import rank_candidates
 from tools.binary.danger_scan import scan_dangerous_functions
 from tools.binary.elf_read import is_elf
@@ -49,7 +50,7 @@ _CGI_DANGER_MARKERS = [
 
 
 def _find_elf_binaries(rootfs: Path) -> list[Path]:
-    return [p for p in sorted(rootfs.rglob("*")) if p.is_file() and is_elf(p)]
+    return [p for p in iter_rootfs_files(rootfs) if is_elf(p)]
 
 
 def _scan_elf(rootfs: Path, path: Path) -> dict[str, Any]:
@@ -190,8 +191,8 @@ def analyze_rootfs(rootfs_dir: str | Path) -> dict[str, Any]:
     # CGI scripts under webroot (and any cgi-bin dir).
     cgi_roots = list(webroots)
     for cgi_root in cgi_roots:
-        for path in sorted(cgi_root.rglob("*")):
-            if path.is_file() and ".cgi" in path.name.lower():
+        for path in iter_rootfs_files(cgi_root):
+            if ".cgi" in path.name.lower():
                 cand = _detect_cgi_command_injection(rootfs, path)
                 if cand:
                     candidates.append(cand)
