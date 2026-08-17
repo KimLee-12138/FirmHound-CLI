@@ -199,11 +199,20 @@ class CandidateVerifier:
             "http_param",
             "http_header",
             "http_cookie",
+            "http_query",
+            "http_body",
             "url_path",
+            "header",
+            "body",
             "soap_argument",
+            "soap_arg",
+            "soap_param",
+            "soap",
             "upnp_argument",
             "socket_input",
-            "config_file",
+            "socket_buffer",
+            "socket_buf",
+            "file_upload",
         }
 
         # 2. User controllable.
