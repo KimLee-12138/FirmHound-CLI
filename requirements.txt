@@ -1,6 +1,8 @@
 # Production dependencies (locked versions)
 pyyaml==6.0.2
 jsonschema==4.21.1
+pyelftools==0.33
+capstone==5.0.9
 pydantic==2.9.2
 requests==2.31.0
 click==8.1.7

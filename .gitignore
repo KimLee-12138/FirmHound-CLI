@@ -35,6 +35,7 @@ tmp/
 .idea/
 *.swp
 *.swo
+.claude/
 
 # Firmware and sensitive samples
 *.bin
