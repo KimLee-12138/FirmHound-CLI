@@ -16,6 +16,7 @@ def test_load_all_skills() -> None:
     assert "04-audit-buffer-overflow" in skills
     assert "06-dynamic-qemu-service-bootstrap" in skills
     assert "06-local-validation" in skills
+    assert "07-report" in skills
     assert "05-candidate-verifier" in skills
 
 
@@ -84,6 +85,15 @@ def test_local_validation_skill() -> None:
     assert "emulation" in skill.frontmatter.get("tags", [])
     steps = skill.workflow_steps()
     assert any("安全门" in s for s in steps)
+
+
+def test_report_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("07-report")
+    assert "report" in skill.frontmatter.get("tags", [])
+    steps = skill.workflow_steps()
+    assert any("脱敏" in s for s in steps)
+    assert any("合规扫描" in s for s in steps)
 
 
 def test_mock_runtime_run_skill() -> None:
