@@ -1,0 +1,22 @@
+project: fsa
+version: "0.1.0"
+
+runtime:
+  default: mock
+  budget:
+    max_tokens_per_run: 100000
+    max_calls_per_stage: 20
+
+paths:
+  runs: ./runs
+  temp: ./tmp
+  schemas: ./schemas
+
+safety:
+  config: config/safety.yaml
+  enforce: true
+
+logging:
+  level: INFO
+  format: jsonl
+  destination: ./runs/logs

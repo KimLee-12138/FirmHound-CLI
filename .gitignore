@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+venv/
+.env/
+.env
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime artifacts
+runs/
+*.log
+*.jsonl
+
+# WorkBuddy memory (local)
+.workbuddy/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Firmware and sensitive samples
+*.bin
+*.trx
+*.chk
+*.img
+*.fw
+firmware_samples/
+secrets/
+
+# macOS
+.DS_Store
