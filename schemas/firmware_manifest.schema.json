@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/firmware_manifest.schema.json",
+  "title": "Firmware Manifest",
+  "description": "Unpacking and triage result for a firmware image (M2).",
+  "type": "object",
+  "required": [
+    "run_id",
+    "firmware_path",
+    "sha256",
+    "md5",
+    "file_size",
+    "vendor",
+    "model",
+    "version",
+    "source",
+    "file_type",
+    "magic_bytes",
+    "filesystem",
+    "rootfs_path",
+    "rootfs_candidates",
+    "architecture",
+    "bits",
+    "endian",
+    "libc",
+    "kernel_hint",
+    "web_servers",
+    "elf_count",
+    "extraction_confidence",
+    "status",
+    "tool_versions"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "firmware_path": {"type": "string"},
+    "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+    "md5": {"type": "string", "pattern": "^[a-fA-F0-9]{32}$"},
+    "file_size": {"type": "integer", "minimum": 0},
+    "vendor": {"type": ["string", "null"]},
+    "model": {"type": ["string", "null"]},
+    "version": {"type": ["string", "null"]},
+    "source": {"type": "string"},
+    "file_type": {"type": "string"},
+    "magic_bytes": {"type": "string", "maxLength": 64},
+    "filesystem": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "offset", "size", "extract_method"],
+        "properties": {
+          "type": {"type": "string"},
+          "offset": {"type": "integer", "minimum": 0},
+          "size": {"type": "integer", "minimum": 0},
+          "extract_method": {"type": "string"}
+        }
+      }
+    },
+    "rootfs_path": {"type": ["string", "null"]},
+    "rootfs_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "score", "markers"],
+        "properties": {
+          "path": {"type": "string"},
+          "score": {"type": "number", "minimum": 0, "maximum": 1},
+          "markers": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "architecture": {"type": ["string", "null"]},
+    "bits": {"type": ["integer", "null"], "enum": [null, 32, 64]},
+    "endian": {"enum": ["little", "big", "unknown", null]},
+    "libc": {"type": ["string", "null"]},
+    "kernel_hint": {"type": ["string", "null"]},
+    "web_servers": {"type": "array", "items": {"type": "string"}},
+    "elf_count": {"type": "integer", "minimum": 0},
+    "extraction_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "status": {"enum": ["success", "partial", "binary_only", "failed"]},
+    "tool_versions": {"type": "object"},
+    "remaining_limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

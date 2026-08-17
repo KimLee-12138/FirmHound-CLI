@@ -1,0 +1,40 @@
+{
+  "run_id": "run-20260817-001",
+  "firmware_path": "/workspace/firmwares/TendaAC15_V15.03.05.19_multi_TD01.bin",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "md5": "00000000000000000000000000000000",
+  "file_size": 10485760,
+  "vendor": null,
+  "model": null,
+  "version": null,
+  "source": "local_upload",
+  "file_type": "uimage",
+  "magic_bytes": "27051956",
+  "filesystem": [
+    {
+      "type": "squashfs",
+      "offset": 2048,
+      "size": 8388608,
+      "extract_method": "binwalk-sasquatch"
+    }
+  ],
+  "rootfs_path": "/tmp/extracted/run-20260817-001/squashfs-root",
+  "rootfs_candidates": [
+    {
+      "path": "/tmp/extracted/run-20260817-001/squashfs-root",
+      "score": 0.95,
+      "markers": ["bin/busybox", "etc/init.d", "usr/bin/httpd"]
+    }
+  ],
+  "architecture": "mipsel",
+  "bits": 32,
+  "endian": "little",
+  "libc": "uClibc",
+  "kernel_hint": "Linux 2.6.36",
+  "web_servers": ["httpd", "lighttpd"],
+  "elf_count": 42,
+  "extraction_confidence": 0.95,
+  "status": "success",
+  "tool_versions": {"binwalk": "2.3.4"},
+  "remaining_limitations": []
+}

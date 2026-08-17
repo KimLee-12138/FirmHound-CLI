@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/task_card.schema.json",
+  "title": "Task Card",
+  "description": "Normalized task description produced by the Task Understanding module (M1).",
+  "type": "object",
+  "required": [
+    "task_id",
+    "raw_input_refs",
+    "objective",
+    "firmware_path",
+    "depth",
+    "constraints",
+    "success_criteria",
+    "authorization"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "raw_input_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "value"],
+        "properties": {
+          "type": {"enum": ["text", "file", "archive_member"]},
+          "value": {"type": "string"}
+        }
+      }
+    },
+    "objective": {
+      "enum": ["firmware_vuln_hunt", "firmware_baseline", "re_analysis", "unknown"]
+    },
+    "firmware_path": {"type": "string", "minLength": 1},
+    "vendor": {"type": ["string", "null"]},
+    "model": {"type": ["string", "null"]},
+    "version": {"type": ["string", "null"]},
+    "depth": {"enum": ["quick", "standard", "full"], "default": "standard"},
+    "constraints": {"type": "array", "items": {"type": "string"}},
+    "success_criteria": {"type": "array", "items": {"type": "string"}},
+    "authorization": {
+      "type": "object",
+      "required": ["holder", "scope", "allow_emulation", "network_isolation"],
+      "properties": {
+        "holder": {"type": "string"},
+        "scope": {"type": "string"},
+        "allow_emulation": {"type": "boolean"},
+        "network_isolation": {"type": "boolean"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

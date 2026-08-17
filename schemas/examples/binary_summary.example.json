@@ -1,0 +1,38 @@
+{
+  "binary_id": "bin-001",
+  "path": "/usr/bin/httpd",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "architecture": "mipsel",
+  "security_features": {
+    "nx": true,
+    "canary": false,
+    "pie": false,
+    "relro": "partial",
+    "stripped": false
+  },
+  "imports": ["system", "sprintf", "strcpy"],
+  "strings_summary": {
+    "dangerous_api": ["system", "strcpy"],
+    "command_templates": ["%s; %s"]
+  },
+  "functions": [
+    {
+      "name": "formexeCommand",
+      "addr": "0x00405000",
+      "callers": ["main"],
+      "callees": ["system"],
+      "strings": ["%s; %s"],
+      "is_source": false,
+      "is_sink": true,
+      "is_auth": false,
+      "is_validation": false
+    }
+  ],
+  "network_functions": ["formexeCommand"],
+  "sources": [],
+  "sinks": ["system"],
+  "auth_functions": [],
+  "validation_functions": [],
+  "triage_score": 0.85,
+  "decompile_status": "full"
+}

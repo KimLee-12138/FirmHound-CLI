@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/attack_surface.schema.json",
+  "title": "Attack Surface",
+  "description": "Enumerated attack surfaces of a firmware image (M3).",
+  "type": "object",
+  "required": ["run_id", "firmware_path", "surfaces"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "firmware_path": {"type": "string"},
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "surface_id",
+          "category",
+          "protocol",
+          "binary",
+          "route",
+          "handler",
+          "input_sources",
+          "auth_hint",
+          "startup_evidence",
+          "reachability_hint",
+          "confidence",
+          "evidence_ids"
+        ],
+        "properties": {
+          "surface_id": {"type": "string"},
+          "category": {"enum": ["web", "cgi", "upnp", "soap", "hnap", "socket", "daemon", "script"]},
+          "protocol": {"type": "string"},
+          "binary": {"type": ["string", "null"]},
+          "route": {"type": ["string", "null"]},
+          "handler": {"type": ["string", "null"]},
+          "input_sources": {
+            "type": "array",
+            "items": {"enum": ["http_param", "header", "cookie", "body", "soap_arg", "socket_buf", "env", "file_upload", "config"]}
+          },
+          "auth_hint": {"enum": ["preauth", "auth", "local_only", "ipc", "unknown"]},
+          "startup_evidence": {"type": "array", "items": {"type": "string"}},
+          "reachability_hint": {"type": "string"},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "evidence_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

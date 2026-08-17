@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/run_state.schema.json",
+  "title": "Run State",
+  "description": "Persisted run state for resume, audit, and failure recovery (M0/M9).",
+  "type": "object",
+  "required": [
+    "run_id",
+    "task_card_ref",
+    "current_stage",
+    "completed_stages",
+    "failed_stages",
+    "retry_count",
+    "artifacts",
+    "decisions",
+    "token_usage",
+    "status",
+    "resume_token"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "task_card_ref": {"type": "string"},
+    "current_stage": {"type": "string"},
+    "completed_stages": {"type": "array", "items": {"type": "string"}},
+    "failed_stages": {"type": "array", "items": {"type": "string"}},
+    "retry_count": {"type": "object"},
+    "artifacts": {"type": "object"},
+    "decisions": {"type": "array", "items": {"type": "string"}},
+    "token_usage": {
+      "type": "object",
+      "properties": {
+        "prompt_tokens": {"type": "integer", "minimum": 0},
+        "completion_tokens": {"type": "integer", "minimum": 0},
+        "calls": {"type": "integer", "minimum": 0}
+      }
+    },
+    "status": {"enum": ["running", "paused", "done", "aborted"]},
+    "resume_token": {"type": "string"}
+  },
+  "additionalProperties": true
+}

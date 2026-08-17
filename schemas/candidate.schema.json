@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/candidate.schema.json",
+  "title": "Vulnerability Candidate",
+  "description": "A potential vulnerability candidate produced by static audit (M5/M6).",
+  "type": "object",
+  "required": [
+    "candidate_id",
+    "surface_id",
+    "binary_id",
+    "entry",
+    "source",
+    "transform",
+    "validation",
+    "authorization",
+    "sink",
+    "call_chain",
+    "user_control",
+    "vuln_class_hypothesis",
+    "risk_score",
+    "risk_level",
+    "evidence",
+    "counterevidence",
+    "conclusion_category",
+    "decisive_missing_fact",
+    "status"
+  ],
+  "properties": {
+    "candidate_id": {"type": "string"},
+    "surface_id": {"type": "string"},
+    "binary_id": {"type": "string"},
+    "entry": {"type": "object"},
+    "source": {"type": "object"},
+    "transform": {"type": "array", "items": {"type": "object"}},
+    "validation": {"type": "array", "items": {"type": "object"}},
+    "authorization": {"type": "object"},
+    "sink": {"type": "object"},
+    "call_chain": {"type": "array", "items": {"anyOf": [{"type": "object"}, {"type": "string"}]}},
+    "user_control": {"enum": ["none", "partial", "full"]},
+    "vuln_class_hypothesis": {
+      "enum": [
+        "command_injection",
+        "overflow",
+        "path_traversal",
+        "auth_bypass",
+        "config_injection",
+        "format_string",
+        "other"
+      ]
+    },
+    "risk_score": {"type": "number", "minimum": 0, "maximum": 30},
+    "risk_level": {"enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "counterevidence": {"type": "array", "items": {"type": "string"}},
+    "conclusion_category": {
+      "enum": [
+        "confirmed-issue",
+        "high-confidence-candidate",
+        "false-positive",
+        "unknown",
+        "observation"
+      ]
+    },
+    "decisive_missing_fact": {"type": ["string", "null"]},
+    "status": {"enum": ["new", "analyzing", "rejected", "strong", "confirmed"]}
+  },
+  "additionalProperties": true
+}

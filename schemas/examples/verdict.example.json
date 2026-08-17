@@ -1,0 +1,17 @@
+{
+  "run_id": "run-20260817-001",
+  "verdicts": [
+    {
+      "candidate_id": "cand-001",
+      "action": "ACCEPT",
+      "original_score": 28,
+      "revised_score": 28,
+      "reasons": [
+        "用户输入直接拼接到 system 调用模板"
+      ],
+      "supporting_evidence": ["ev-001", "ev-002"],
+      "counterevidence": [],
+      "reviewer": "rule"
+    }
+  ]
+}

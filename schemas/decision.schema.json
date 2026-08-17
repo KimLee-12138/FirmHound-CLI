@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/decision.schema.json",
+  "title": "Decision Record",
+  "description": "A decision made by the orchestrator or its actors (M0/M9).",
+  "type": "object",
+  "required": [
+    "decision_id",
+    "stage",
+    "inputs",
+    "observation",
+    "options",
+    "selected",
+    "reason",
+    "confidence",
+    "next_stage",
+    "actor"
+  ],
+  "properties": {
+    "decision_id": {"type": "string"},
+    "stage": {"type": "string"},
+    "inputs": {"type": "array", "items": {"type": "string"}},
+    "observation": {"type": "string"},
+    "options": {"type": "array", "items": {"type": "string"}},
+    "selected": {"type": "string"},
+    "reason": {"type": "string"},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "next_stage": {"type": "string"},
+    "actor": {"enum": ["model", "rule", "human"]}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,22 @@
+{
+  "run_id": "run-20260817-001",
+  "firmware_path": "/workspace/firmwares/TendaAC15_V15.03.05.19_multi_TD01.bin",
+  "surfaces": [
+    {
+      "surface_id": "surf-001",
+      "category": "cgi",
+      "protocol": "http",
+      "binary": "/usr/bin/httpd",
+      "route": "/goform/formexeCommand",
+      "handler": "formexeCommand",
+      "input_sources": ["http_param"],
+      "auth_hint": "preauth",
+      "startup_evidence": [
+        "etc/init.d/rcS:23: /usr/bin/httpd &"
+      ],
+      "reachability_hint": "LAN web admin",
+      "confidence": 0.92,
+      "evidence_ids": ["ev-001"]
+    }
+  ]
+}

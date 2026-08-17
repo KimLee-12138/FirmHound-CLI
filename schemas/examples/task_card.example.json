@@ -1,0 +1,24 @@
+{
+  "task_id": "run-20260817-001",
+  "raw_input_refs": [
+    {"type": "text", "value": "对 Tenda AC15 固件进行完整漏洞挖掘，重点检查命令注入"}
+  ],
+  "objective": "firmware_vuln_hunt",
+  "firmware_path": "/workspace/firmwares/TendaAC15_V15.03.05.19_multi_TD01.bin",
+  "vendor": null,
+  "model": null,
+  "version": null,
+  "depth": "full",
+  "constraints": ["重点检查命令注入", "只做静态分析"],
+  "success_criteria": [
+    "输出攻击面枚举",
+    "输出 Top-K 候选与证据",
+    "结论必须可解释"
+  ],
+  "authorization": {
+    "holder": "team1",
+    "scope": "lab-only",
+    "allow_emulation": false,
+    "network_isolation": true
+  }
+}

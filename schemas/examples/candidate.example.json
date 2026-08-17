@@ -1,0 +1,21 @@
+{
+  "candidate_id": "cand-001",
+  "surface_id": "surf-001",
+  "binary_id": "bin-001",
+  "entry": {"function": "formexeCommand", "addr": "0x00405000"},
+  "source": {"type": "http_param", "name": "cmd"},
+  "transform": [{"type": "concat", "detail": "%s; %s"}],
+  "validation": [],
+  "authorization": {"required": false, "evidence": []},
+  "sink": {"function": "system", "type": "command_execution", "detail": "user input concatenated into shell command"},
+  "call_chain": ["formexeCommand", "system"],
+  "user_control": "full",
+  "vuln_class_hypothesis": "command_injection",
+  "risk_score": 28,
+  "risk_level": "CRITICAL",
+  "evidence": ["ev-001", "ev-002"],
+  "counterevidence": [],
+  "conclusion_category": "confirmed-issue",
+  "decisive_missing_fact": null,
+  "status": "confirmed"
+}

@@ -1,0 +1,16 @@
+{
+  "evidence_id": "ev-001",
+  "run_id": "run-20260817-001",
+  "stage": "surface",
+  "type": "command_output",
+  "source_file": null,
+  "command": "grep -R formexeCommand /tmp/extracted/run-20260817-001/squashfs-root/etc",
+  "tool": "grep",
+  "tool_version": "3.11",
+  "timestamp": "2026-08-17T10:00:00Z",
+  "artifact_path": null,
+  "observation": "Found route /goform/formexeCommand referenced in lighttpd config",
+  "fact_status": "confirmed",
+  "supports": ["surf-001"],
+  "contradicts": []
+}

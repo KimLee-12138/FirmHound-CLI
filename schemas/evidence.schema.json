@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/evidence.schema.json",
+  "title": "Evidence Item",
+  "description": "A single piece of evidence in the evidence store (M9).",
+  "type": "object",
+  "required": [
+    "evidence_id",
+    "run_id",
+    "stage",
+    "type",
+    "source_file",
+    "command",
+    "tool",
+    "tool_version",
+    "timestamp",
+    "artifact_path",
+    "observation",
+    "fact_status",
+    "supports",
+    "contradicts"
+  ],
+  "properties": {
+    "evidence_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "stage": {"type": "string"},
+    "type": {
+      "enum": [
+        "command_output",
+        "file_observation",
+        "decompile",
+        "emulation",
+        "human_input"
+      ]
+    },
+    "source_file": {"type": ["string", "null"]},
+    "command": {"type": ["string", "null"]},
+    "tool": {"type": "string"},
+    "tool_version": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "artifact_path": {"type": ["string", "null"]},
+    "observation": {"type": "string"},
+    "fact_status": {"enum": ["confirmed", "inferred", "unknown", "external-reference"]},
+    "supports": {"type": "array", "items": {"type": "string"}},
+    "contradicts": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

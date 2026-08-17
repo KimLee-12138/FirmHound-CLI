@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/verdict.schema.json",
+  "title": "Verifier Verdict",
+  "description": "Top-K candidate verdict produced by the Verifier (M7).",
+  "type": "object",
+  "required": ["run_id", "verdicts"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "action",
+          "original_score",
+          "revised_score",
+          "reasons",
+          "supporting_evidence",
+          "counterevidence",
+          "reviewer"
+        ],
+        "properties": {
+          "candidate_id": {"type": "string"},
+          "action": {"enum": ["ACCEPT", "DOWNGRADE", "REJECT", "NEED_DYNAMIC"]},
+          "original_score": {"type": "number", "minimum": 0, "maximum": 30},
+          "revised_score": {"type": "number", "minimum": 0, "maximum": 30},
+          "reasons": {"type": "array", "items": {"type": "string"}},
+          "supporting_evidence": {"type": "array", "items": {"type": "string"}},
+          "counterevidence": {"type": "array", "items": {"type": "string"}},
+          "reviewer": {"enum": ["mock", "model", "human", "rule"]}
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,21 @@
+{
+  "run_id": "run-20260817-001",
+  "task_card_ref": "task_card.run-20260817-001.json",
+  "current_stage": "binary",
+  "completed_stages": ["task_understanding", "unpack", "surface"],
+  "failed_stages": [],
+  "retry_count": {},
+  "artifacts": {
+    "task_card": "runs/run-20260817-001/task_card.json",
+    "firmware_manifest": "runs/run-20260817-001/firmware_manifest.json",
+    "attack_surface": "runs/run-20260817-001/attack_surface.json"
+  },
+  "decisions": ["dec-001"],
+  "token_usage": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "calls": 0
+  },
+  "status": "running",
+  "resume_token": "resume-run-20260817-001-binary"
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/binary_summary.schema.json",
+  "title": "Binary Summary",
+  "description": "Static analysis summary of one ELF binary (M4).",
+  "type": "object",
+  "required": [
+    "binary_id",
+    "path",
+    "sha256",
+    "architecture",
+    "security_features",
+    "imports",
+    "strings_summary",
+    "functions",
+    "network_functions",
+    "sources",
+    "sinks",
+    "auth_functions",
+    "validation_functions",
+    "triage_score",
+    "decompile_status"
+  ],
+  "properties": {
+    "binary_id": {"type": "string"},
+    "path": {"type": "string"},
+    "sha256": {"type": "string"},
+    "architecture": {"type": "string"},
+    "security_features": {
+      "type": "object",
+      "required": ["nx", "canary", "pie", "relro", "stripped"],
+      "properties": {
+        "nx": {"type": "boolean"},
+        "canary": {"type": "boolean"},
+        "pie": {"type": "boolean"},
+        "relro": {"enum": ["none", "partial", "full", "unknown"]},
+        "stripped": {"type": "boolean"}
+      }
+    },
+    "imports": {"type": "array", "items": {"type": "string"}},
+    "strings_summary": {"type": "object"},
+    "functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "addr"],
+        "properties": {
+          "name": {"type": "string"},
+          "addr": {"type": "string"},
+          "callers": {"type": "array", "items": {"type": "string"}},
+          "callees": {"type": "array", "items": {"type": "string"}},
+          "strings": {"type": "array", "items": {"type": "string"}},
+          "is_source": {"type": "boolean"},
+          "is_sink": {"type": "boolean"},
+          "is_auth": {"type": "boolean"},
+          "is_validation": {"type": "boolean"}
+        }
+      }
+    },
+    "network_functions": {"type": "array", "items": {"type": "string"}},
+    "sources": {"type": "array", "items": {"type": "string"}},
+    "sinks": {"type": "array", "items": {"type": "string"}},
+    "auth_functions": {"type": "array", "items": {"type": "string"}},
+    "validation_functions": {"type": "array", "items": {"type": "string"}},
+    "triage_score": {"type": "number", "minimum": 0, "maximum": 1},
+    "decompile_status": {"enum": ["full", "fallback", "failed"]}
+  },
+  "additionalProperties": true
+}

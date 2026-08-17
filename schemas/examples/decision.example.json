@@ -1,0 +1,12 @@
+{
+  "decision_id": "dec-001",
+  "stage": "surface",
+  "inputs": ["attack_surface.json"],
+  "observation": "At least one pre-auth CGI endpoint found; continue to binary analysis",
+  "options": ["continue", "skip_to_report"],
+  "selected": "continue",
+  "reason": "Pre-auth surface present; worth binary triage",
+  "confidence": 0.9,
+  "next_stage": "binary",
+  "actor": "rule"
+}
