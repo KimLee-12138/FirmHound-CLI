@@ -10,10 +10,28 @@ def test_load_all_skills() -> None:
     skills = loader.list_skills()
     assert "01-unpack" in skills
     assert "02-attack-surface" in skills
+    assert "03-binary-decompile" in skills
+    assert "04-static-analysis" in skills
     assert "04-audit-command-injection" in skills
     assert "04-audit-buffer-overflow" in skills
     assert "06-dynamic-qemu-service-bootstrap" in skills
     assert "05-candidate-verifier" in skills
+
+
+def test_binary_decompile_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("03-binary-decompile")
+    assert "binary" in skill.frontmatter.get("tags", [])
+    fallbacks = skill.failure_fallbacks()
+    assert any("Ghidra" in f["scenario"] for f in fallbacks)
+
+
+def test_static_analysis_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("04-static-analysis")
+    assert "dataflow" in skill.frontmatter.get("tags", [])
+    steps = skill.workflow_steps()
+    assert any("命令注入五步法" in s for s in steps)
 
 
 def test_get_skill_metadata() -> None:
