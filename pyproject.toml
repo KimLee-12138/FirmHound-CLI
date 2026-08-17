@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fsa"
 version = "0.1.0"
-description = "Firmware Security Agent for AI-assisted vulnerability discovery in IoT firmware."
+description = "FirmHound (固件猎犬): Firmware Security Agent for AI-assisted vulnerability discovery in IoT firmware."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "First Team", email = "team1@example.edu" }
 ]
-keywords = ["firmware", "security", "iot", "static-analysis", "dynamic-analysis"]
+keywords = ["firmware", "security", "iot", "static-analysis", "dynamic-analysis", "vulnerability-discovery"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
