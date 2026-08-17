@@ -10,6 +10,9 @@ def test_load_all_skills() -> None:
     skills = loader.list_skills()
     assert "01-unpack" in skills
     assert "02-attack-surface" in skills
+    assert "04-audit-command-injection" in skills
+    assert "04-audit-buffer-overflow" in skills
+    assert "06-dynamic-qemu-service-bootstrap" in skills
     assert "05-candidate-verifier" in skills
 
 
@@ -40,6 +43,20 @@ def test_acceptance_criteria() -> None:
     skill = loader.get("02-attack-surface")
     criteria = skill.acceptance_criteria()
     assert any("formexeCommand" in c for c in criteria)
+
+
+def test_audit_command_injection_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("04-audit-command-injection")
+    assert "command_injection" in skill.frontmatter.get("tags", [])
+    steps = skill.workflow_steps()
+    assert any("入口定位" in s for s in steps)
+
+
+def test_dynamic_qemu_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("06-dynamic-qemu-service-bootstrap")
+    assert "qemu" in skill.frontmatter.get("tags", [])
 
 
 def test_mock_runtime_run_skill() -> None:
