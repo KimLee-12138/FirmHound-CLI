@@ -2,6 +2,7 @@
 
 from tools.analysis.dataflow import assemble_chain, verify_variable_usage
 from tools.analysis.fp_filter import apply_fp_filters
+from tools.analysis.risk_score import rank_candidates, score_candidate, select_top
 from tools.analysis.source_sink_rules import (
     classify_sink,
     classify_source,
@@ -17,4 +18,7 @@ __all__ = [
     "classify_source",
     "classify_validation",
     "match_binary",
+    "score_candidate",
+    "rank_candidates",
+    "select_top",
 ]
