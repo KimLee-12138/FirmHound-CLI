@@ -59,8 +59,11 @@ def cmd_dev(args: argparse.Namespace) -> int:
 
 
 def cmd_test(args: argparse.Namespace) -> int:
-    """Run pytest."""
-    return run([PYTHON, "-m", "pytest"], cwd=REPO_ROOT)
+    """Run pytest with optional WSL tool wrappers on Windows."""
+    wrappers = REPO_ROOT / "tools" / "wsl_wrappers"
+    env = os.environ.copy()
+    env["PATH"] = str(wrappers) + os.pathsep + env.get("PATH", "")
+    return subprocess.call([PYTHON, "-m", "pytest"], cwd=REPO_ROOT, env=env)
 
 
 def cmd_lint(args: argparse.Namespace) -> int:

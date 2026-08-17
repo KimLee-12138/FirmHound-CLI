@@ -32,7 +32,10 @@ def _docker_available() -> bool:
 
 
 def _linux_tool_available() -> bool:
-    return all(shutil.which(tool) for tool in ["file", "binwalk", "unsquashfs", "readelf"])
+    return all(
+        shutil.which(tool)
+        for tool in ["file", "binwalk", "unsquashfs", "readelf", "mksquashfs"]
+    )
 
 
 @pytest.fixture
@@ -42,7 +45,7 @@ def linux_ready() -> bool:
 
 
 def _build_squashfs_fixture(tmp_path: Path) -> Path:
-    """Build a tiny SquashFS fixture inside Docker and copy it back."""
+    """Build a tiny SquashFS fixture using the host/WSL toolchain."""
     fixture_dir = tmp_path / "rootfs"
     fixture_dir.mkdir()
     (fixture_dir / "bin").mkdir()
@@ -51,26 +54,20 @@ def _build_squashfs_fixture(tmp_path: Path) -> Path:
     (fixture_dir / "etc" / "init.d" / "rcS").write_text("#!/bin/sh\n", encoding="utf-8")
 
     image_path = tmp_path / "fixture.squashfs"
+    # On Windows the Linux tools are .bat shims (tools/wsl_wrappers), which
+    # CreateProcess can only launch via their resolved absolute path.
+    mksquashfs = shutil.which("mksquashfs") or "mksquashfs"
     subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            f"{tmp_path}:/work",
-            "ubuntu:22.04",
-            "bash",
-            "-c",
-            "apt-get update -qq && apt-get install -y -qq squashfs-tools >/dev/null 2>&1 && "
-            "mksquashfs /work/rootfs /work/fixture.squashfs -noappend -quiet",
-        ],
+        [mksquashfs, str(fixture_dir), str(image_path), "-noappend", "-quiet"],
         check=True,
         timeout=120,
+        text=True,
+        errors="replace",
     )
     return image_path
 
 
-@pytest.mark.skipif(not _docker_available(), reason="Docker not available")
+@pytest.mark.skipif(not _linux_tool_available(), reason="Linux extraction tools not available")
 def test_manifest_from_squashfs_fixture(tmp_path: Path) -> None:
     """A real SquashFS fixture produces a valid firmware_manifest.json."""
     fw = _build_squashfs_fixture(tmp_path)

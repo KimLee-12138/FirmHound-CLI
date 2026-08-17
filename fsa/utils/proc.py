@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import shlex
+import shutil
 import subprocess
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +43,13 @@ def run_command(
     """
     if isinstance(cmd, str):
         cmd = shlex.split(cmd)
-    command_str = shlex.join(str(c) for c in cmd)
+    cmd = [str(c) for c in cmd]
+    # On Windows, resolve executable through PATHEXT so .bat/.cmd wrappers work.
+    if sys.platform == "win32" and cmd and not Path(cmd[0]).is_absolute():
+        resolved = shutil.which(cmd[0])
+        if resolved:
+            cmd[0] = resolved
+    command_str = shlex.join(cmd)
     try:
         proc = subprocess.run(
             cmd,
@@ -50,6 +58,7 @@ def run_command(
             shell=shell,
             capture_output=True,
             text=True,
+            errors="replace",
             check=False,
         )
         status = "success" if proc.returncode == 0 else "failed"
