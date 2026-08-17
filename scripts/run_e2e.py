@@ -87,7 +87,8 @@ def _detect_elf_command_injection(rootfs: Path, path: Path) -> dict[str, Any] | 
     # Look for an env-var / query-string hint that is attacker-controlled.
     all_text = " ".join(strings)
     network_hint = any(
-        h in all_text for h in ("QUERY_STRING", "HTTP_", "NewDownloadURL", "NewStatusURL", "SOAPAction")
+        h in all_text
+        for h in ("QUERY_STRING", "HTTP_", "NewDownloadURL", "NewStatusURL", "SOAPAction")
     )
     source: dict[str, Any] = (
         {"type": "http_query", "name": "QUERY_STRING"}
@@ -187,7 +188,7 @@ def analyze_rootfs(rootfs_dir: str | Path) -> dict[str, Any]:
             candidates.append(cand)
 
     # CGI scripts under webroot (and any cgi-bin dir).
-    cgi_roots = [r for r in webroots]
+    cgi_roots = list(webroots)
     for cgi_root in cgi_roots:
         for path in sorted(cgi_root.rglob("*")):
             if path.is_file() and ".cgi" in path.name.lower():

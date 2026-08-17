@@ -180,7 +180,11 @@ def _attack_surface(entry: dict, run_id: str) -> dict:
         "surfaces": [
             {
                 "surface_id": f"surf-{entry['cve_id']}",
-                "category": "upnp" if entry["source_type"] == "soap_arg" else ("web" if entry["route"].startswith("/goform") else "cgi"),
+                "category": (
+                    "upnp"
+                    if entry["source_type"] == "soap_arg"
+                    else ("web" if entry["route"].startswith("/goform") else "cgi")
+                ),
                 "protocol": "HTTP/UPnP" if entry["source_type"] == "soap_arg" else "HTTP",
                 "binary": entry["binary"],
                 "route": entry["route"],
@@ -197,7 +201,11 @@ def _attack_surface(entry: dict, run_id: str) -> dict:
 
 
 def _candidate(entry: dict) -> dict:
-    cat = "command_injection" if entry["vuln_class"] == "command_injection" else ("overflow" if entry["vuln_class"] == "overflow" else "other")
+    cat = (
+        "command_injection"
+        if entry["vuln_class"] == "command_injection"
+        else ("overflow" if entry["vuln_class"] == "overflow" else "other")
+    )
     score = 28 if entry["auth_hint"] == "preauth" else 22
     level = "CRITICAL" if score >= 26 else "HIGH"
     return {
@@ -212,7 +220,10 @@ def _candidate(entry: dict) -> dict:
         "sink": {
             "function": entry["sink_function"],
             "type": "command_execution" if cat == "command_injection" else "memory_copy",
-            "detail": f"{entry['source_name']} reaches {entry['sink_function']} without length/filter check",
+            "detail": (
+                f"{entry['source_name']} reaches {entry['sink_function']}"
+                " without length/filter check"
+            ),
         },
         "call_chain": [entry["handler"], entry["sink_function"]],
         "user_control": "full",
@@ -221,8 +232,14 @@ def _candidate(entry: dict) -> dict:
         "risk_level": level,
         "evidence": [f"ev-{entry['cve_id']}-source", f"ev-{entry['cve_id']}-sink"],
         "counterevidence": [],
-        "conclusion_category": "confirmed-issue" if not entry.get("needs_dynamic") else "high-confidence-candidate",
-        "decisive_missing_fact": None if not entry.get("needs_dynamic") else "Requires dynamic validation in QEMU to confirm reachable crash",
+        "conclusion_category": (
+            "confirmed-issue" if not entry.get("needs_dynamic") else "high-confidence-candidate"
+        ),
+        "decisive_missing_fact": (
+            None
+            if not entry.get("needs_dynamic")
+            else "Requires dynamic validation in QEMU to confirm reachable crash"
+        ),
         "status": "confirmed" if not entry.get("needs_dynamic") else "strong",
         "metadata": {
             "cve_id": entry["cve_id"],
@@ -244,11 +261,15 @@ def _verdict(entry: dict, run_id: str) -> dict:
                 "original_score": 28 if entry["auth_hint"] == "preauth" else 22,
                 "revised_score": 28 if entry["auth_hint"] == "preauth" else 22,
                 "reasons": [
-                    f"{entry['source_name']} is an external input reaching {entry['sink_function']}.",
+                    f"{entry['source_name']} is an external input reaching "
+                    f"{entry['sink_function']}.",
                     "No effective filter or length check found.",
                     "Call chain from handler to sink is supported by static evidence.",
                 ],
-                "supporting_evidence": [f"ev-{entry['cve_id']}-source", f"ev-{entry['cve_id']}-sink"],
+                "supporting_evidence": [
+                    f"ev-{entry['cve_id']}-source",
+                    f"ev-{entry['cve_id']}-sink",
+                ],
                 "counterevidence": [],
                 "reviewer": "rule",
             }

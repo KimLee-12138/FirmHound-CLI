@@ -1,7 +1,7 @@
 ---
-id: 06-local-validation
-title: 本地动态验证（QEMU/FirmAE）
-tags: [dynamic, emulation, qemu, firmae, m8]
+id: 06-dynamic-validation
+title: 本地动态验证（L0–L3 分层，QEMU/FirmAE）
+tags: [dynamic, validation, emulation, qemu, firmae, m8]
 ---
 
 # Skill 06：本地动态验证（L0–L3 分层）

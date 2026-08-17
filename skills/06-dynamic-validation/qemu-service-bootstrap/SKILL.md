@@ -1,10 +1,10 @@
 ---
-id: 06-dynamic-qemu-service-bootstrap
+id: 06-dynamic-validation-qemu-service-bootstrap
 title: QEMU 服务启动与漏洞本地验证
 tags: [dynamic, qemu, local_validation, m7, m8]
 ---
 
-# Skill 06-dynamic-01：QEMU 服务启动与漏洞本地验证
+# Skill 06-dynamic-validation-01：QEMU 服务启动与漏洞本地验证
 
 ## 目标
 

@@ -14,10 +14,22 @@ def test_load_all_skills() -> None:
     assert "04-static-analysis" in skills
     assert "04-audit-command-injection" in skills
     assert "04-audit-buffer-overflow" in skills
-    assert "06-dynamic-qemu-service-bootstrap" in skills
-    assert "06-local-validation" in skills
+    assert "06-dynamic-validation-qemu-service-bootstrap" in skills
+    assert "06-dynamic-validation" in skills
     assert "07-report" in skills
     assert "05-candidate-verifier" in skills
+    assert "00-orchestrator" in skills
+
+
+def test_orchestrator_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("00-orchestrator")
+    assert "orchestrator" in skill.frontmatter.get("tags", [])
+    steps = skill.workflow_steps()
+    assert any("解析任务卡" in s for s in steps)
+    assert any("反证审查" in s for s in steps)
+    fallbacks = skill.failure_fallbacks()
+    assert any("required 阶段 error" in f["scenario"] for f in fallbacks)
 
 
 def test_binary_decompile_skill() -> None:
@@ -75,13 +87,13 @@ def test_audit_command_injection_skill() -> None:
 
 def test_dynamic_qemu_skill() -> None:
     loader = SkillLoader()
-    skill = loader.get("06-dynamic-qemu-service-bootstrap")
+    skill = loader.get("06-dynamic-validation-qemu-service-bootstrap")
     assert "qemu" in skill.frontmatter.get("tags", [])
 
 
 def test_local_validation_skill() -> None:
     loader = SkillLoader()
-    skill = loader.get("06-local-validation")
+    skill = loader.get("06-dynamic-validation")
     assert "emulation" in skill.frontmatter.get("tags", [])
     steps = skill.workflow_steps()
     assert any("安全门" in s for s in steps)

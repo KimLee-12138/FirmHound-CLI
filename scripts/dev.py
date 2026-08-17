@@ -25,7 +25,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PYTHON = sys.executable
 
@@ -104,7 +103,15 @@ def cmd_clean(args: argparse.Namespace) -> int:
 def cmd_smoke(args: argparse.Namespace) -> int:
     """Run end-to-end smoke test."""
     return run(
-        [PYTHON, "-m", "fsa.cli", "--config", "config/dev.yaml", "smoke", "tests/fixtures/sample.bin"],
+        [
+            PYTHON,
+            "-m",
+            "fsa.cli",
+            "--config",
+            "config/dev.yaml",
+            "smoke",
+            "tests/fixtures/sample.bin",
+        ],
         cwd=REPO_ROOT,
     )
 

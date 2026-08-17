@@ -86,7 +86,7 @@ def main() -> int:
             "risk_score": c["risk_score"],
             "risk_level": c["risk_level"],
             "vuln_class_hypothesis": c.get("vuln_class_hypothesis"),
-            **{k: v for k, v in _metadata(c).items()},
+            **_metadata(c),
         }
         for i, c in enumerate(ranked, start=1)
     ]

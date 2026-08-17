@@ -213,7 +213,7 @@ firmware-security-agent/
 │   ├── 03-binary-decompile/SKILL.md
 │   ├── 04-static-analysis/SKILL.md
 │   ├── 05-candidate-verifier/SKILL.md
-│   ├── 06-local-validation/SKILL.md
+│   ├── 06-dynamic-validation/SKILL.md
 │   └── 07-evidence-report/SKILL.md
 │
 ├── tools/                         # 确定性工具（每个都是可独立执行的 CLI）
@@ -615,7 +615,7 @@ Entry → Source → Transform → Validation → Authorization → Sink
 - `tools/emulation/qemu_system.py` — L2/L3：tap/bridge 编排、快照、串口日志采集；网络配置只接受私有段。
 - `tools/emulation/firmae_wrap.py` — FirmAE 探测到才启用，否则跳过并记录 limitation。
 - `tools/emulation/probes.py` — 基线连通性（`curl -i --max-time 5`）、无害探针白名单执行、冷热启动可重复性检查（各至少 1 次）。
-- `skills/06-local-validation/SKILL.md` — 含 qemu-user 三大坑（br0 ioctl 死循环、/dev/nvram 修补、假监听 socket）的处理知识与"连通性先于触发"原则。
+- `skills/06-dynamic-validation/SKILL.md` — 含 qemu-user 三大坑（br0 ioctl 死循环、/dev/nvram 修补、假监听 socket）的处理知识与"连通性先于触发"原则。
 
 ### 验收（DoD）
 

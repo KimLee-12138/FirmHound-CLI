@@ -111,7 +111,7 @@ def render_report(result: dict[str, Any]) -> str:
         "",
         f"- 候选总数：{result['total_candidates']}",
         f"- 进入 Verifier 的 Top-K：{result['top_k']}",
-        f"- 裁决统计："
+        "- 裁决统计："
         + "、".join(f"{_ACTION_LABEL.get(a, a)} {n}" for a, n in sorted(by_action.items())),
         "",
         "## 1. 风险评分排序",
