@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from fsa.runtime import load_runtime
-from fsa.runtime.base import Budget, ModelReply, ToolResult
+from fsa.runtime.base import Budget, ModelReply
 from fsa.runtime.mock import MockRuntime
 from fsa.runtime.openai_compatible import OpenAICompatibleRuntime
 from fsa.utils.jsonio import load_yaml

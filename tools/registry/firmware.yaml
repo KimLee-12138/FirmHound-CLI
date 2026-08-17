@@ -1,0 +1,46 @@
+tools:
+  - name: tools.firmware.collect_info
+    module_path: tools.firmware.collect_info
+    function_name: collect_info
+    description: Collect basic metadata and hashes from a firmware file.
+    args_schema:
+      type: object
+      properties:
+        firmware_path:
+          type: string
+      required: [firmware_path]
+
+  - name: tools.firmware.unpack
+    module_path: tools.firmware.unpack
+    function_name: unpack_firmware
+    description: Extract firmware into candidate rootfs directories.
+    args_schema:
+      type: object
+      properties:
+        firmware_path:
+          type: string
+        output_dir:
+          type: string
+      required: [firmware_path]
+
+  - name: tools.firmware.rootfs_score
+    module_path: tools.firmware.rootfs_score
+    function_name: score_rootfs_candidates
+    description: Score extracted directories by rootfs-likelihood.
+    args_schema:
+      type: object
+      properties:
+        extracted_dir:
+          type: string
+      required: [extracted_dir]
+
+  - name: tools.firmware.arch_detect
+    module_path: tools.firmware.arch_detect
+    function_name: detect_architecture
+    description: Detect target architecture from ELF samples.
+    args_schema:
+      type: object
+      properties:
+        rootfs_dir:
+          type: string
+      required: [rootfs_dir]

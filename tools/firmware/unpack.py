@@ -6,15 +6,12 @@ and falls back to carving when needed.
 
 from __future__ import annotations
 
-import re
 import shutil
 from pathlib import Path
 from typing import Any
 
 from fsa.safety.policy_engine import PolicyEngine
-from fsa.utils.jsonio import save_json
-from fsa.utils.proc import RunResult, run_command
-
+from fsa.utils.proc import run_command
 
 # Map from binwalk description keyword to extraction strategy.
 STRATEGIES: list[dict[str, Any]] = [
@@ -61,7 +58,15 @@ def _normalize_tool_args(args: list[str], fw: Path, out: Path) -> list[str]:
 
 def _check_extractors() -> dict[str, bool]:
     """Check which external extractors are available on PATH."""
-    names = ["unsquashfs", "sasquatch", "7z", "ubireader_extract_images", "jefferson", "cpio", "binwalk"]
+    names = [
+        "unsquashfs",
+        "sasquatch",
+        "7z",
+        "ubireader_extract_images",
+        "jefferson",
+        "cpio",
+        "binwalk",
+    ]
     return {name: shutil.which(name) is not None for name in names}
 
 
@@ -86,17 +91,21 @@ def _extract_with_strategy(
         cmd = _normalize_tool_args(tool_chain, fw, out)
         binary = cmd[0]
         if binary not in ("dd", "gzip") and not available.get(binary):
-            attempts.append({"command": " ".join(cmd), "status": "skipped", "reason": "tool not found"})
+            attempts.append(
+                {"command": " ".join(cmd), "status": "skipped", "reason": "tool not found"}
+            )
             continue
 
         out.mkdir(parents=True, exist_ok=True)
         result = run_command(cmd, timeout=300)
-        attempts.append({
-            "command": result.command,
-            "status": result.status,
-            "returncode": result.returncode,
-            "stderr_tail": result.stderr[-500:],
-        })
+        attempts.append(
+            {
+                "command": result.command,
+                "status": result.status,
+                "returncode": result.returncode,
+                "stderr_tail": result.stderr[-500:],
+            }
+        )
         if result.status == "success":
             return {"status": "success", "method": strategy["name"], "attempts": attempts}
     return {"status": "failed", "method": strategy["name"], "attempts": attempts}
@@ -125,12 +134,14 @@ def _carve_fallback(fw: Path, out: Path) -> dict[str, Any]:
                 with slice_path.open("wb") as wh:
                     wh.write(data[offset:])
                 carved_any = True
-                attempts.append({
-                    "offset": offset,
-                    "kind": kind,
-                    "slice": str(slice_path),
-                    "status": "carved",
-                })
+                attempts.append(
+                    {
+                        "offset": offset,
+                        "kind": kind,
+                        "slice": str(slice_path),
+                        "status": "carved",
+                    }
+                )
 
     return {
         "status": "partial" if carved_any else "failed",

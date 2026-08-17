@@ -27,8 +27,7 @@ def test_md5_file(tmp_path: Path) -> None:
 def test_sha256_bytes() -> None:
     """SHA-256 of known bytes should match."""
     assert (
-        sha256_bytes(b"hello")
-        == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        sha256_bytes(b"hello") == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
     )
 
 

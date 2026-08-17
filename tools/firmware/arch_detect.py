@@ -14,7 +14,6 @@ from typing import Any
 
 from fsa.utils.proc import run_command
 
-
 # Map readelf architecture strings to a canonical name.
 ARCH_MAP: dict[str, str] = {
     "mips": "mips",
@@ -107,7 +106,7 @@ def _parse_elf_magic(path: Path) -> dict[str, Any] | None:
     endian = "little" if ei_data == 1 else ("big" if ei_data == 2 else "unknown")
 
     # e_type at offset 16, e_machine at offset 18 (both 2 bytes).
-    e_type = struct.unpack_from(f"{endian_flag}H", header, 16)[0]
+    _e_type = struct.unpack_from(f"{endian_flag}H", header, 16)[0]
     machine = struct.unpack_from(f"{endian_flag}H", header, 18)[0]
     entry = struct.unpack_from(f"{endian_flag}I", header, 24)[0]
 
@@ -157,10 +156,12 @@ def detect_architecture(rootfs_dir: str | Path, max_samples: int = 20) -> dict[s
             continue
         header = _readelf_header(path) if use_readelf else _parse_elf_magic(path)
         if header:
-            samples.append({
-                "path": str(path.relative_to(root)),
-                **header,
-            })
+            samples.append(
+                {
+                    "path": str(path.relative_to(root)),
+                    **header,
+                }
+            )
         if len(samples) >= max_samples:
             break
 

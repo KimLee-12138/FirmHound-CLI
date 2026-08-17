@@ -10,7 +10,9 @@ from tools.web.webroot_enum import enumerate_webroot, find_webroots
 def _elf_header() -> bytes:
     """Return a minimal valid 32-bit little-endian MIPS ELF header."""
     return (
-        b"\x7fELF" + b"\x01\x01\x01\x00" + b"\x00" * 8
+        b"\x7fELF"
+        + b"\x01\x01\x01\x00"
+        + b"\x00" * 8
         + b"\x01\x00"  # e_type
         + b"\x08\x00"  # e_machine = MIPS
         + b"\x01\x00\x00\x00"

@@ -1,7 +1,6 @@
 """Unit tests for firmware unpacking tools."""
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -71,13 +70,13 @@ def test_collect_info_file_not_found(tmp_path: Path) -> None:
 
 
 def test_unpack_missing_firmware(tmp_path: Path) -> None:
-    """unpack raises for missing firmware."""
+    """Unpack raises for missing firmware."""
     with pytest.raises(FileNotFoundError):
         unpack(tmp_path / "missing.bin", tmp_path / "out")
 
 
 def test_unpack_carve_fallback(tmp_path: Path) -> None:
-    """unpack falls back to carving when no strategy matches."""
+    """Unpack falls back to carving when no strategy matches."""
     fw = tmp_path / "fw.bin"
     # Fake squashfs magic at offset 16.
     data = b"A" * 16 + b"hsqs" + b"B" * 32
@@ -110,10 +109,10 @@ def test_arch_detect_consistent_elf(tmp_path: Path) -> None:
     # Minimal valid 32-bit little-endian MIPS ELF header.
     header = (
         b"\x7fELF"  # magic (0-3)
-        b"\x01"      # 32-bit (4)
-        b"\x01"      # little-endian (5)
-        b"\x01"      # ELF version (6)
-        b"\x00"      # OS/ABI (7)
+        b"\x01"  # 32-bit (4)
+        b"\x01"  # little-endian (5)
+        b"\x01"  # ELF version (6)
+        b"\x00"  # OS/ABI (7)
         + b"\x00" * 8  # pad to fill e_ident[16] (8-15)
         + b"\x01\x00"  # e_type = executable (16-17)
         + b"\x08\x00"  # e_machine = MIPS (18-19)

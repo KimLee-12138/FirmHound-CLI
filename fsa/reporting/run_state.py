@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ class TokenUsage:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, int]) -> "TokenUsage":
+    def from_dict(cls, data: dict[str, int]) -> TokenUsage:
         return cls(**data)
 
 
@@ -122,7 +122,7 @@ class RunState:
         return self._state
 
     @classmethod
-    def create(cls, run_root: str | Path, run_id: str | None = None) -> "RunState":
+    def create(cls, run_root: str | Path, run_id: str | None = None) -> RunState:
         """Create a new run state with a generated or supplied run id."""
         run_id = run_id or f"run-{uuid.uuid4().hex[:12]}"
         instance = cls(run_id, run_root)
@@ -130,7 +130,7 @@ class RunState:
         return instance
 
     @classmethod
-    def resume(cls, run_id: str, run_root: str | Path) -> "RunState":
+    def resume(cls, run_id: str, run_root: str | Path) -> RunState:
         """Resume an existing run state."""
         instance = cls(run_id, run_root)
         instance.load()

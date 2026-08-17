@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +15,20 @@ from fsa.utils.jsonio import load_json, save_json
 class EvidenceStore:
     """Store evidence items as individual JSON files and provide lookups."""
 
-    def __init__(self, run_id: str, run_root: str | Path) -> None:
-        self.layout = RunLayout(run_id, run_root)
+    def __init__(self, run_id: str | Path, run_root: str | Path | None = None) -> None:
+        """Initialize evidence store.
+
+        Supports two calling conventions:
+          - EvidenceStore(run_id, run_root) -> root = run_root / run_id
+          - EvidenceStore(run_dir) -> root = run_dir, run_id inferred from name
+        """
+        if run_root is None:
+            run_dir = Path(run_id)
+            run_id_str = run_dir.name
+            run_root_str = run_dir.parent
+            self.layout = RunLayout(run_id_str, run_root_str)
+        else:
+            self.layout = RunLayout(str(run_id), run_root)
 
     def add(
         self,
@@ -46,7 +58,7 @@ class EvidenceStore:
             "command": command,
             "tool": tool,
             "tool_version": tool_version,
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "artifact_path": artifact_path,
             "observation": observation,
             "fact_status": fact_status,
@@ -76,3 +88,25 @@ class EvidenceStore:
     def find_supporting(self, target_id: str) -> list[dict[str, Any]]:
         """Return evidence items that support ``target_id``."""
         return [item for item in self.list_all() if target_id in item.get("supports", [])]
+
+    def next_id(self) -> str:
+        """Return the next sequential evidence id for simple append API."""
+        return f"ev-{len(self.list_all()) + 1:04d}"
+
+    def append(self, item: dict[str, Any]) -> dict[str, Any]:
+        """Append a pre-constructed evidence item (used by human_gate)."""
+        evidence_id = item.get("evidence_id") or self.next_id()
+        item["evidence_id"] = evidence_id
+        item.setdefault("run_id", self.layout.run_id)
+        item.setdefault("tool", "human_gate")
+        item.setdefault("tool_version", "1.0")
+        item.setdefault("timestamp", datetime.now(UTC).isoformat().replace("+00:00", "Z"))
+        item.setdefault("source_file", None)
+        item.setdefault("command", None)
+        item.setdefault("artifact_path", None)
+        item.setdefault("supports", [])
+        item.setdefault("contradicts", [])
+        item.setdefault("fact_status", "confirmed")
+        validate(item, schema_name="evidence")
+        save_json(self.layout.evidence_path(evidence_id), item)
+        return item

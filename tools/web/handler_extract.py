@@ -65,12 +65,14 @@ def extract_handlers(binary_path: str | Path) -> dict[str, Any]:
             continue
         seen.add(full)
         route = f"/goform/{full}"
-        goahead_forms.append({
-            "handler": full,
-            "route": route,
-            "category": "goahead_form",
-            "evidence": full,
-        })
+        goahead_forms.append(
+            {
+                "handler": full,
+                "route": route,
+                "category": "goahead_form",
+                "evidence": full,
+            }
+        )
 
     cgi_hits: list[dict[str, Any]] = []
     seen_cgi: set[str] = set()
@@ -79,12 +81,14 @@ def extract_handlers(binary_path: str | Path) -> dict[str, Any]:
         if route in seen_cgi:
             continue
         seen_cgi.add(route)
-        cgi_hits.append({
-            "handler": path.name,
-            "route": route,
-            "category": "cgi_string",
-            "evidence": route,
-        })
+        cgi_hits.append(
+            {
+                "handler": path.name,
+                "route": route,
+                "category": "cgi_string",
+                "evidence": route,
+            }
+        )
 
     routes: list[dict[str, Any]] = []
     seen_routes: set[str] = set()
@@ -93,12 +97,14 @@ def extract_handlers(binary_path: str | Path) -> dict[str, Any]:
         if route in seen_routes or route.count("/") < 2:
             continue
         seen_routes.add(route)
-        routes.append({
-            "handler": path.name,
-            "route": route,
-            "category": "url_route_string",
-            "evidence": route,
-        })
+        routes.append(
+            {
+                "handler": path.name,
+                "route": route,
+                "category": "url_route_string",
+                "evidence": route,
+            }
+        )
 
     http_env = sorted(set(HTTP_ENV_RE.findall(text)))
     goahead_registered = bool(GOAHEAD_REGISTER.search(text))

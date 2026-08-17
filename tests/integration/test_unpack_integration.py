@@ -53,10 +53,14 @@ def _build_squashfs_fixture(tmp_path: Path) -> Path:
     image_path = tmp_path / "fixture.squashfs"
     subprocess.run(
         [
-            "docker", "run", "--rm",
-            "-v", f"{tmp_path}:/work",
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{tmp_path}:/work",
             "ubuntu:22.04",
-            "bash", "-c",
+            "bash",
+            "-c",
             "apt-get update -qq && apt-get install -y -qq squashfs-tools >/dev/null 2>&1 && "
             "mksquashfs /work/rootfs /work/fixture.squashfs -noappend -quiet",
         ],

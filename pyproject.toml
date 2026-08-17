@@ -21,9 +21,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "pyyaml>=6.0.1",
+    "pyyaml>=6.0.2",
     "jsonschema>=4.20.0",
-    "pydantic>=2.5.0",
+    "pydantic>=2.9.0",
     "requests>=2.31.0",
     "click>=8.1.0",
     "rich>=13.7.0",
@@ -50,10 +50,12 @@ include = ["fsa*", "tools*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-select = ["E", "F", "W", "I", "N", "D", "UP", "B", "C4", "SIM"]
-ignore = ["D100", "D104"]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "D", "UP", "B", "C4", "SIM"]
+ignore = ["D100", "D103", "D104"]
+
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.pytest.ini_options]

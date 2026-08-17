@@ -7,10 +7,9 @@ Outputs a dict matching the top-level fields of ``firmware_manifest.schema.json`
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from typing import Any
-
-import shutil
 
 from fsa.utils.hashing import md5_file, sha256_file
 from fsa.utils.proc import run_command
@@ -43,11 +42,13 @@ def _binwalk_signatures(path: Path) -> list[dict[str, Any]]:
         # Typical line: "123456 | 0x1E240 | Squashfs filesystem ..."
         m = re.match(r"^\s*(\d+)\s+\|\s+(0x[0-9a-fA-F]+)\s+\|\s+(.+)$", line)
         if m:
-            matches.append({
-                "offset": int(m.group(1)),
-                "offset_hex": m.group(2),
-                "description": m.group(3).strip(),
-            })
+            matches.append(
+                {
+                    "offset": int(m.group(1)),
+                    "offset_hex": m.group(2),
+                    "description": m.group(3).strip(),
+                }
+            )
     return matches
 
 

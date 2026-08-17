@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from fsa.runtime.base import AgentRuntime, Budget, ModelReply, SkillResult, ToolResult
+from fsa.runtime.skill_loader import SkillLoader
 
 
 class MockRuntime(AgentRuntime):
@@ -40,12 +40,28 @@ class MockRuntime(AgentRuntime):
         )
 
     def run_skill(self, skill_name: str, context: dict[str, Any]) -> SkillResult:
-        """Mock skill execution: return a placeholder success."""
-        return SkillResult(
-            status="success",
-            deliverables={"skill": skill_name, "mode": "mock"},
-            evidence_refs=[],
-        )
+        """Mock skill execution: load the SKILL.md and return its workflow summary."""
+        try:
+            loader = SkillLoader()
+            skill = loader.get(skill_name)
+            return SkillResult(
+                status="success",
+                deliverables={
+                    "skill": skill_name,
+                    "mode": "mock",
+                    "title": skill.frontmatter.get("title", ""),
+                    "workflow_steps": skill.workflow_steps(),
+                    "fallbacks": skill.failure_fallbacks(),
+                    "acceptance_criteria": skill.acceptance_criteria(),
+                },
+                evidence_refs=[],
+            )
+        except KeyError:
+            return SkillResult(
+                status="failed",
+                deliverables={"skill": skill_name, "mode": "mock"},
+                evidence_refs=[],
+            )
 
     def call_tool(self, tool_name: str, args: dict[str, Any]) -> ToolResult:
         """Mock tool call: echo args back with a heuristic status."""

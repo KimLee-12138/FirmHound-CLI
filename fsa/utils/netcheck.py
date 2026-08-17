@@ -5,7 +5,6 @@ from __future__ import annotations
 import ipaddress
 import re
 
-
 # RFC 1918 + link-local + loopback + multicast
 _PRIVATE_NETWORKS = [
     ipaddress.ip_network("10.0.0.0/8"),
@@ -25,10 +24,7 @@ def is_private_ip(addr: str) -> bool:
         return False
     if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_private:
         return True
-    for net in _PRIVATE_NETWORKS:
-        if ip in net:
-            return True
-    return False
+    return any(ip in net for net in _PRIVATE_NETWORKS)
 
 
 def contains_private_ip(text: str) -> bool:

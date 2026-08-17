@@ -8,11 +8,8 @@ Implements a three-layer cross-check:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
 
 L1_EXEMPT_KEYWORDS = ["noauth", "skip_auth", "whitelist", "auth_not_required", "public"]
 L2_AUTH_FUNCTIONS = [

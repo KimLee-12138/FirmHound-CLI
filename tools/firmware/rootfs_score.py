@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-
 MARKERS: dict[str, int] = {
     "has_bin": 1,
     "has_sbin": 1,
@@ -93,9 +92,11 @@ def score_rootfs_candidates(extracted_dir: str | Path) -> dict[str, Any]:
         if not child.is_dir():
             continue
         # Treat the root itself as a candidate if it has typical top-level dirs.
-        if any((root / name).is_dir() for name in ("bin", "sbin", "etc", "lib", "usr")):
-            if root not in [Path(c["path"]) for c in candidates]:
-                candidates.append(_score_directory(root))
+        has_top_level = any(
+            (root / name).is_dir() for name in ("bin", "sbin", "etc", "lib", "usr")
+        )
+        if has_top_level and root not in [Path(c["path"]) for c in candidates]:
+            candidates.append(_score_directory(root))
         if any((child / name).is_dir() for name in ("bin", "sbin", "etc", "lib", "usr")):
             candidates.append(_score_directory(child))
 

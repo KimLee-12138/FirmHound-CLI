@@ -14,7 +14,9 @@ from tools.web.build_attack_surface import build_attack_surface
 def _elf_header() -> bytes:
     """Return a minimal valid 32-bit little-endian MIPS ELF header."""
     return (
-        b"\x7fELF" + b"\x01\x01\x01\x00" + b"\x00" * 8
+        b"\x7fELF"
+        + b"\x01\x01\x01\x00"
+        + b"\x00" * 8
         + b"\x01\x00"  # e_type
         + b"\x08\x00"  # e_machine = MIPS
         + b"\x01\x00\x00\x00"
@@ -50,13 +52,11 @@ def _make_hg532e_like(root: Path) -> None:
     (root / "usr" / "bin").mkdir(parents=True)
     (root / "etc" / "init.d").mkdir(parents=True)
     (root / "usr" / "bin" / "upnp").write_bytes(_elf_header())
-    (root / "etc" / "init.d" / "rcS").write_text(
-        "#!/bin/sh\n/usr/bin/upnp &\n", encoding="utf-8"
-    )
+    (root / "etc" / "init.d" / "rcS").write_text("#!/bin/sh\n/usr/bin/upnp &\n", encoding="utf-8")
     upnp_dir = root / "upnp"
     upnp_dir.mkdir(parents=True)
     (upnp_dir / "DevUpg.xml").write_text(
-        '''<?xml version="1.0"?>
+        """<?xml version="1.0"?>
         <scpd>
           <actionList>
             <action>
@@ -74,7 +74,7 @@ def _make_hg532e_like(root: Path) -> None:
             </action>
           </actionList>
         </scpd>
-        ''',
+        """,
         encoding="utf-8",
     )
 

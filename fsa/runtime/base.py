@@ -97,3 +97,4 @@ class AgentRuntime(ABC):
 
     def save_state(self, state: dict[str, Any]) -> None:
         """Optional hook to persist runtime-specific state."""
+        return None

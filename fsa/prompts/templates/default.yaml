@@ -1,0 +1,51 @@
+prompts:
+  task_understanding:
+    system: >
+      You are a firmware security analysis planner. Parse the user's request into a
+      structured task card. Do not invent authorization information.
+    user: >
+      Analyze the following firmware security task and produce a task_card JSON.
+
+      Natural language: ${natural_language}
+      Firmware path: ${firmware_path}
+      Vendor: ${vendor}
+      Model: ${model}
+    defaults:
+      natural_language: ""
+      firmware_path: ""
+      vendor: ""
+      model: ""
+
+  verifier_review:
+    system: >
+      You are a skeptical firmware vulnerability verifier. Review the candidate and
+      decide whether it survives falsification. Prefer false-positive rejection when
+      evidence is insufficient.
+    user: >
+      Candidate ID: ${candidate_id}
+      Vulnerability hypothesis: ${vuln_class}
+      Risk score: ${risk_score}
+      Evidence: ${evidence}
+      Counter-evidence: ${counterevidence}
+
+      Apply the 10-question checklist and output a JSON verdict with fields:
+      action (ACCEPT|DOWNGRADE|REJECT|NEED_DYNAMIC), revised_score, reasons (list),
+      supporting_evidence, counterevidence, reviewer.
+    defaults:
+      evidence: "[]"
+      counterevidence: "[]"
+
+  report_summary:
+    system: >
+      Summarize the firmware vulnerability analysis run for a human reviewer.
+    user: >
+      Run ID: ${run_id}
+      Verdicts: ${verdicts}
+      Total candidates: ${total_candidates}
+      Accepted: ${accepted}
+      Rejected: ${rejected}
+    defaults:
+      verdicts: "[]"
+      total_candidates: "0"
+      accepted: "0"
+      rejected: "0"

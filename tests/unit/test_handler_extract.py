@@ -10,9 +10,7 @@ from tools.web.upnp_parse import find_upnp_xmls, parse_upnp_xml
 def test_extract_goahead_form(tmp_path: Path) -> None:
     """handler_extract finds GoAhead formXxx handlers."""
     binary = tmp_path / "httpd"
-    binary.write_bytes(
-        b"httpd\x00formexeCommand\x00websFormDefine\x00formWifiBasic\x00"
-    )
+    binary.write_bytes(b"httpd\x00formexeCommand\x00websFormDefine\x00formWifiBasic\x00")
     result = extract_handlers(binary)
     assert result["goahead_registered"] is True
     routes = {h["route"] for h in result["goahead_forms"]}
@@ -41,7 +39,7 @@ def test_parse_upnp_xml(tmp_path: Path) -> None:
     """parse_upnp_xml extracts actions with direction=in inputs."""
     xml = tmp_path / "DevUpg.xml"
     xml.write_text(
-        '''<?xml version="1.0"?>
+        """<?xml version="1.0"?>
         <scpd>
           <actionList>
             <action>
@@ -63,7 +61,7 @@ def test_parse_upnp_xml(tmp_path: Path) -> None:
             </action>
           </actionList>
         </scpd>
-        ''',
+        """,
         encoding="utf-8",
     )
     result = parse_upnp_xml(xml)

@@ -14,8 +14,20 @@ from fsa.utils.jsonio import load_json, save_json
 class DecisionStore:
     """Store decision records as individual JSON files."""
 
-    def __init__(self, run_id: str, run_root: str | Path) -> None:
-        self.layout = RunLayout(run_id, run_root)
+    def __init__(self, run_id: str | Path, run_root: str | Path | None = None) -> None:
+        """Initialize decision store.
+
+        Supports two calling conventions:
+          - DecisionStore(run_id, run_root) -> root = run_root / run_id
+          - DecisionStore(run_dir) -> root = run_dir, run_id inferred from name
+        """
+        if run_root is None:
+            run_dir = Path(run_id)
+            run_id_str = run_dir.name
+            run_root_str = run_dir.parent
+            self.layout = RunLayout(run_id_str, run_root_str)
+        else:
+            self.layout = RunLayout(str(run_id), run_root)
 
     def add(
         self,
@@ -64,3 +76,19 @@ class DecisionStore:
         for path in sorted(self.layout.decision_dir.glob("*.json")):
             records.append(load_json(path))
         return records
+
+    def next_id(self) -> str:
+        """Return the next sequential decision id for simple append API."""
+        return f"dec-{len(self.list_all()) + 1:04d}"
+
+    def append(self, item: dict[str, Any]) -> dict[str, Any]:
+        """Append a pre-constructed decision record (used by orchestrator)."""
+        decision_id = item.get("decision_id") or self.next_id()
+        item["decision_id"] = decision_id
+        item.setdefault("observation", "")
+        item.setdefault("next_stage", "")
+        item.setdefault("inputs", [])
+        item.setdefault("actor", "orchestrator")
+        validate(item, schema_name="decision")
+        save_json(self.layout.decision_path(decision_id), item)
+        return item

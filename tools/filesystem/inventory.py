@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-
 SCRIPT_EXTENSIONS = {".sh", ".lua", ".php", ".py", ".cgi", ".js"}
 CONFIG_DIRS = {"etc", "conf", "config", "configs"}
 WEBROOT_NAMES = {"www", "htdocs", "web", "webroot", "html"}
@@ -75,10 +74,7 @@ def _is_config(path: Path) -> bool:
     suffixes = {".conf", ".cfg", ".ini", ".xml", ".json", ".yaml", ".yml"}
     if path.suffix.lower() in suffixes:
         return True
-    for part in path.parts:
-        if part.lower() in CONFIG_DIRS:
-            return True
-    return False
+    return any(part.lower() in CONFIG_DIRS for part in path.parts)
 
 
 def _is_startup_script(path: Path) -> bool:

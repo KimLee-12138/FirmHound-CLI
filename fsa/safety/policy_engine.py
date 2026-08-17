@@ -43,6 +43,13 @@ class PolicyEngine:
         self.policy_path = Path(policy_path)
         self.policy = self._load(self.policy_path)
 
+    @classmethod
+    def from_yaml(cls, path: str | Path | None = None) -> PolicyEngine:
+        """Load policy from the default config/safety.yaml or a provided path."""
+        if path is None:
+            path = Path(__file__).parent.parent.parent / "config" / "safety.yaml"
+        return cls(path)
+
     @staticmethod
     def _load(path: Path) -> Policy:
         with path.open("r", encoding="utf-8") as fh:
@@ -66,9 +73,7 @@ class PolicyEngine:
             blocked_paths=resolve_paths(raw.get("blocked_paths", [])),
             command_blacklist=raw.get("command_blacklist", []),
             network_allow_public=raw.get("network", {}).get("allow_public", False),
-            network_allowed_hosts=set(
-                raw.get("network", {}).get("allowed_hosts", [])
-            ),
+            network_allowed_hosts=set(raw.get("network", {}).get("allowed_hosts", [])),
             model_limits=raw.get("model", {}),
         )
 

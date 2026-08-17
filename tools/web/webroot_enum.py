@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
-
 
 ENDPOINT_SUFFIXES = {".cgi", ".asp", ".aspx", ".php", ".lua", ".json", ".xml", ".htm", ".html"}
 FUNCTIONAL_KEYWORDS: dict[str, list[str]] = {
@@ -58,13 +56,15 @@ def enumerate_webroot(webroot_dir: str | Path) -> dict[str, Any]:
             or "cgi-bin" in [p.lower() for p in rel.parts]
         ):
             categories = classify_endpoint(path.name)
-            endpoints.append({
-                "route": route,
-                "file": str(rel),
-                "handler": str(rel),
-                "category": categories,
-                "suffix": suffix,
-            })
+            endpoints.append(
+                {
+                    "route": route,
+                    "file": str(rel),
+                    "handler": str(rel),
+                    "category": categories,
+                    "suffix": suffix,
+                }
+            )
 
     endpoints.sort(key=lambda x: x["route"])
     return {

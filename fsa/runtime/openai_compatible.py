@@ -6,6 +6,7 @@ import os
 from typing import Any
 
 from fsa.runtime.base import AgentRuntime, Budget, ModelReply, SkillResult, ToolResult
+from fsa.runtime.skill_loader import SkillLoader
 
 
 class OpenAICompatibleRuntime(AgentRuntime):
@@ -26,9 +27,7 @@ class OpenAICompatibleRuntime(AgentRuntime):
             try:
                 import openai
             except ImportError as exc:
-                raise RuntimeError(
-                    "openai package not installed; run: pip install openai"
-                ) from exc
+                raise RuntimeError("openai package not installed; run: pip install openai") from exc
             api_key = os.environ.get(self.api_key_env)
             self._client = openai.OpenAI(
                 base_url=self.base_url,
@@ -73,11 +72,24 @@ class OpenAICompatibleRuntime(AgentRuntime):
             )
 
     def run_skill(self, skill_name: str, context: dict[str, Any]) -> SkillResult:
-        """Skills are executed by the orchestrator; runtime only provides model calls."""
-        return SkillResult(
-            status="success",
-            deliverables={"skill": skill_name, "mode": "openai_compatible"},
-        )
+        """Load skill metadata; runtime provides model calls while orchestrator executes."""
+        try:
+            loader = SkillLoader()
+            skill = loader.get(skill_name)
+            return SkillResult(
+                status="success",
+                deliverables={
+                    "skill": skill_name,
+                    "mode": "openai_compatible",
+                    "title": skill.frontmatter.get("title", ""),
+                    "workflow_steps": skill.workflow_steps(),
+                },
+            )
+        except KeyError:
+            return SkillResult(
+                status="failed",
+                deliverables={"skill": skill_name, "mode": "openai_compatible"},
+            )
 
     def call_tool(self, tool_name: str, args: dict[str, Any]) -> ToolResult:
         """Tools are executed by the registry; runtime only provides model calls."""

@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 SERVICE_PATTERNS = [
     re.compile(r"^\s*(?:/usr)?/s?bin/(\S+)\s+(.+)$"),
     re.compile(r"^\s*(\S+/\S+)\s+(.+)$"),
@@ -36,13 +35,15 @@ def parse_startup_script(path: Path) -> list[dict[str, Any]]:
         if Path(binary).name in IGNORED_BINARIES:
             continue
 
-        services.append({
-            "binary": binary,
-            "args": args,
-            "source_file": str(path),
-            "line": lineno,
-            "raw": raw,
-        })
+        services.append(
+            {
+                "binary": binary,
+                "args": args,
+                "source_file": str(path),
+                "line": lineno,
+                "raw": raw,
+            }
+        )
     return services
 
 
@@ -56,7 +57,7 @@ def _extract_command(line: str) -> tuple[str, str]:
 
     # Strip common prefixes like /usr/bin/env.
     if cleaned.startswith("/usr/bin/env "):
-        cleaned = cleaned[len("/usr/bin/env "):]
+        cleaned = cleaned[len("/usr/bin/env ") :]
 
     tokens = cleaned.split()
     if not tokens:

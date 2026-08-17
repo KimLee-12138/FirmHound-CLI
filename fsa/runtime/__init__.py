@@ -2,6 +2,7 @@
 
 from fsa.runtime.base import AgentRuntime, Budget, ModelReply, SkillResult, ToolResult
 from fsa.runtime.mock import MockRuntime
+from fsa.runtime.skill_loader import SkillLoader
 
 __all__ = [
     "AgentRuntime",
@@ -10,14 +11,16 @@ __all__ = [
     "SkillResult",
     "ToolResult",
     "MockRuntime",
+    "SkillLoader",
     "load_runtime",
 ]
 
 
 def load_runtime(name: str, config: dict | None = None) -> AgentRuntime:
     """Factory: load a runtime by name from config/models.yaml."""
-    from fsa.utils.jsonio import load_yaml
     from pathlib import Path
+
+    from fsa.utils.jsonio import load_yaml
 
     if config is None:
         config = load_yaml(Path(__file__).parent.parent.parent / "config" / "models.yaml")

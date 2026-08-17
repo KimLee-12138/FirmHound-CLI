@@ -53,20 +53,22 @@ def build_attack_surface(
         for ep in enum["endpoints"]:
             surface_id = _surface_id()
             auth = classify_auth(ep["route"], None, None, None)
-            surfaces.append({
-                "surface_id": surface_id,
-                "category": "web" if ep["suffix"] in {".html", ".htm"} else "cgi",
-                "protocol": "http",
-                "binary": None,
-                "route": ep["route"],
-                "handler": ep["file"],
-                "input_sources": ["http_param"],
-                "auth_hint": auth.hint,
-                "startup_evidence": [],
-                "reachability_hint": "LAN web admin",
-                "confidence": auth.confidence,
-                "evidence_ids": [_evidence_id()],
-            })
+            surfaces.append(
+                {
+                    "surface_id": surface_id,
+                    "category": "web" if ep["suffix"] in {".html", ".htm"} else "cgi",
+                    "protocol": "http",
+                    "binary": None,
+                    "route": ep["route"],
+                    "handler": ep["file"],
+                    "input_sources": ["http_param"],
+                    "auth_hint": auth.hint,
+                    "startup_evidence": [],
+                    "reachability_hint": "LAN web admin",
+                    "confidence": auth.confidence,
+                    "evidence_ids": [_evidence_id()],
+                }
+            )
 
     # Binary handler extraction for all ELF binaries.
     inv = inventory_rootfs(root)
@@ -76,20 +78,22 @@ def build_attack_surface(
         for form in extracted["goahead_forms"]:
             surface_id = _surface_id()
             auth = classify_auth(form["route"], elf_path, form["handler"], None)
-            surfaces.append({
-                "surface_id": surface_id,
-                "category": "cgi",
-                "protocol": "http",
-                "binary": str(elf_path.relative_to(root).as_posix()),
-                "route": form["route"],
-                "handler": form["handler"],
-                "input_sources": ["http_param"],
-                "auth_hint": auth.hint,
-                "startup_evidence": [],
-                "reachability_hint": "LAN web admin (handler in binary)",
-                "confidence": 0.85 if extracted["goahead_registered"] else 0.6,
-                "evidence_ids": [_evidence_id()],
-            })
+            surfaces.append(
+                {
+                    "surface_id": surface_id,
+                    "category": "cgi",
+                    "protocol": "http",
+                    "binary": str(elf_path.relative_to(root).as_posix()),
+                    "route": form["route"],
+                    "handler": form["handler"],
+                    "input_sources": ["http_param"],
+                    "auth_hint": auth.hint,
+                    "startup_evidence": [],
+                    "reachability_hint": "LAN web admin (handler in binary)",
+                    "confidence": 0.85 if extracted["goahead_registered"] else 0.6,
+                    "evidence_ids": [_evidence_id()],
+                }
+            )
 
     # UPnP surfaces.
     for xml_path in find_upnp_xmls(root):
@@ -98,20 +102,22 @@ def build_attack_surface(
             if not action["inputs"]:
                 continue
             surface_id = _surface_id()
-            surfaces.append({
-                "surface_id": surface_id,
-                "category": "upnp",
-                "protocol": "soap",
-                "binary": None,
-                "route": f"/upnp/{Path(xml_path).name}",
-                "handler": action["name"],
-                "input_sources": ["soap_arg"],
-                "auth_hint": "preauth",
-                "startup_evidence": [],
-                "reachability_hint": "LAN UPnP",
-                "confidence": 0.9 if action["high_impact"] else 0.7,
-                "evidence_ids": [_evidence_id()],
-            })
+            surfaces.append(
+                {
+                    "surface_id": surface_id,
+                    "category": "upnp",
+                    "protocol": "soap",
+                    "binary": None,
+                    "route": f"/upnp/{Path(xml_path).name}",
+                    "handler": action["name"],
+                    "input_sources": ["soap_arg"],
+                    "auth_hint": "preauth",
+                    "startup_evidence": [],
+                    "reachability_hint": "LAN UPnP",
+                    "confidence": 0.9 if action["high_impact"] else 0.7,
+                    "evidence_ids": [_evidence_id()],
+                }
+            )
 
     # Startup-driven daemon surfaces.
     startup = parse_all_startup(root)
@@ -122,20 +128,22 @@ def build_attack_surface(
             continue
         surface_id = _surface_id()
         evidence = [f"{s['source_file']}:{s['line']}" for s in services[:3]]
-        surfaces.append({
-            "surface_id": surface_id,
-            "category": "daemon",
-            "protocol": "unknown",
-            "binary": services[0]["binary"],
-            "route": None,
-            "handler": name,
-            "input_sources": ["socket_buf"],
-            "auth_hint": "unknown",
-            "startup_evidence": evidence,
-            "reachability_hint": "started at boot",
-            "confidence": 0.6,
-            "evidence_ids": [_evidence_id()],
-        })
+        surfaces.append(
+            {
+                "surface_id": surface_id,
+                "category": "daemon",
+                "protocol": "unknown",
+                "binary": services[0]["binary"],
+                "route": None,
+                "handler": name,
+                "input_sources": ["socket_buf"],
+                "auth_hint": "unknown",
+                "startup_evidence": evidence,
+                "reachability_hint": "started at boot",
+                "confidence": 0.6,
+                "evidence_ids": [_evidence_id()],
+            }
+        )
 
     attack_surface = {
         "run_id": run_id,

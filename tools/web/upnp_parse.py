@@ -10,7 +10,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-
 HIGH_IMPACT_ACTIONS = {
     "upgrade",
     "update",
@@ -59,18 +58,22 @@ def parse_upnp_xml(xml_path: str | Path) -> dict[str, Any]:
                 and name_arg is not None
                 and name_arg.text
             ):
-                inputs.append({
-                    "name": name_arg.text,
-                    "related_state_variable": related.text if related is not None else None,
-                })
+                inputs.append(
+                    {
+                        "name": name_arg.text,
+                        "related_state_variable": related.text if related is not None else None,
+                    }
+                )
 
         is_high_impact = any(hia in action_name.lower() for hia in HIGH_IMPACT_ACTIONS)
-        actions.append({
-            "name": action_name,
-            "inputs": inputs,
-            "high_impact": is_high_impact,
-            "input_count": len(inputs),
-        })
+        actions.append(
+            {
+                "name": action_name,
+                "inputs": inputs,
+                "high_impact": is_high_impact,
+                "input_count": len(inputs),
+            }
+        )
 
     return {
         "file": str(path.resolve()),
