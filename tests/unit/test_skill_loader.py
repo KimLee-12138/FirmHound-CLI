@@ -15,6 +15,7 @@ def test_load_all_skills() -> None:
     assert "04-audit-command-injection" in skills
     assert "04-audit-buffer-overflow" in skills
     assert "06-dynamic-qemu-service-bootstrap" in skills
+    assert "06-local-validation" in skills
     assert "05-candidate-verifier" in skills
 
 
@@ -75,6 +76,14 @@ def test_dynamic_qemu_skill() -> None:
     loader = SkillLoader()
     skill = loader.get("06-dynamic-qemu-service-bootstrap")
     assert "qemu" in skill.frontmatter.get("tags", [])
+
+
+def test_local_validation_skill() -> None:
+    loader = SkillLoader()
+    skill = loader.get("06-local-validation")
+    assert "emulation" in skill.frontmatter.get("tags", [])
+    steps = skill.workflow_steps()
+    assert any("安全门" in s for s in steps)
 
 
 def test_mock_runtime_run_skill() -> None:
