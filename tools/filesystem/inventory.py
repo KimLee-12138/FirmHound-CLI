@@ -1,0 +1,100 @@
+"""Inventory a rootfs directory."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+
+SCRIPT_EXTENSIONS = {".sh", ".lua", ".php", ".py", ".cgi", ".js"}
+CONFIG_DIRS = {"etc", "conf", "config", "configs"}
+WEBROOT_NAMES = {"www", "htdocs", "web", "webroot", "html"}
+
+
+def inventory_rootfs(rootfs_dir: str | Path) -> dict[str, Any]:
+    """Create a structured inventory of a rootfs.
+
+    Returns counts and paths for ELF binaries, scripts, configuration files,
+    webroots, and startup scripts.
+    """
+    root = Path(rootfs_dir)
+    if not root.exists():
+        raise FileNotFoundError(f"Rootfs not found: {root}")
+
+    elfs: list[str] = []
+    scripts: list[str] = []
+    configs: list[str] = []
+    startup_scripts: list[str] = []
+    webroots: list[str] = []
+
+    for path in root.rglob("*"):
+        if not path.is_file():
+            if path.is_dir() and path.name.lower() in WEBROOT_NAMES:
+                webroots.append(path.relative_to(root).as_posix())
+            continue
+
+        rel = path.relative_to(root).as_posix()
+        try:
+            magic = path.read_bytes()[:4]
+        except OSError:
+            continue
+
+        if magic == b"\x7fELF":
+            elfs.append(rel)
+        elif path.suffix.lower() in SCRIPT_EXTENSIONS:
+            scripts.append(rel)
+        elif _is_config(path):
+            configs.append(rel)
+
+        if _is_startup_script(path):
+            startup_scripts.append(rel)
+
+    # Also look for webroot directories that may be nested (e.g. usr/www).
+    for candidate in ["www", "htdocs", "web", "html"]:
+        for found in root.rglob(candidate):
+            rel_posix = found.relative_to(root).as_posix()
+            if found.is_dir() and rel_posix not in webroots:
+                webroots.append(rel_posix)
+
+    return {
+        "rootfs": str(root.resolve()),
+        "elf_count": len(elfs),
+        "elf_paths": elfs,
+        "script_count": len(scripts),
+        "script_paths": scripts,
+        "config_count": len(configs),
+        "config_paths": configs,
+        "startup_script_count": len(startup_scripts),
+        "startup_script_paths": startup_scripts,
+        "webroots": webroots,
+    }
+
+
+def _is_config(path: Path) -> bool:
+    """Heuristic: file is a config if under a config dir or has common suffix."""
+    suffixes = {".conf", ".cfg", ".ini", ".xml", ".json", ".yaml", ".yml"}
+    if path.suffix.lower() in suffixes:
+        return True
+    for part in path.parts:
+        if part.lower() in CONFIG_DIRS:
+            return True
+    return False
+
+
+def _is_startup_script(path: Path) -> bool:
+    """Heuristic: file is a startup script if path contains init.d/rcS/rc.local."""
+    parts = [p.lower() for p in path.parts]
+    return any(p in parts for p in ("init.d", "rc.d", "rcs", "rc.local")) or path.name in (
+        "rcS",
+        "rc.local",
+    )
+
+
+if __name__ == "__main__":
+    import json
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python -m tools.filesystem.inventory <rootfs_dir>")
+        raise SystemExit(1)
+    print(json.dumps(inventory_rootfs(sys.argv[1]), indent=2))
