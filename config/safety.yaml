@@ -1,0 +1,46 @@
+# Safety policy for Firmware Security Agent.
+# Any change to this file is a security-relevant change and must be reviewed.
+
+enforce: true
+abort_on_violation: true
+
+# Allowed working directories. Commands must only read/write under these roots.
+allowed_paths:
+  - "./runs"
+  - "./tmp"
+  - "./tests/fixtures"
+  - "./firmware_samples"
+
+# Deny reading/writing these paths even if they are under an allowed root.
+blocked_paths:
+  - ".env"
+  - "config/safety.yaml"
+  - "secrets"
+
+# Shell commands that are never allowed.
+command_blacklist:
+  - pattern: "^rm\\s+-[rf]+.*"
+    reason: "recursive delete is dangerous"
+  - pattern: "curl\\s+"
+    reason: "network fetch must go through controlled downloader"
+  - pattern: "wget\\s+"
+    reason: "network fetch must go through controlled downloader"
+  - pattern: "bash\\s+-i"
+    reason: "interactive shell not allowed"
+  - pattern: "python\\s+-m\\s+http\\.server"
+    reason: "do not spawn ad-hoc servers"
+
+# Network targets: only private/reserved IP addresses are reachable.
+network:
+  allow_public: false
+  allowed_hosts:
+    - "127.0.0.1"
+    - "localhost"
+
+# Model runtime constraints.
+model:
+  max_tokens_per_run: 100000
+  max_calls_per_stage: 20
+  forbidden_requests:
+    - "ignore previous instructions"
+    - "disregard safety policy"
