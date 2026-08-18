@@ -1,79 +1,99 @@
-# FirmHound 固件猎犬 · Firmware Security Agent (FSA)
+<div align="center">
 
-> 第一队 · 挑战杯「揭榜挂帅」专项赛 — 具备自主决策能力的通用网络安全智能体
-> IoT 固件漏洞挖掘自动化系统：解包 → 攻击面 → 二进制分析 → 静态审计 → 风险评分 → 反证验证 → 动态验证 → 证据报告
+# FirmHound 固件猎犬
+
+**IoT 固件漏洞挖掘自动化流水线** · 解包 → 攻击面 → 二进制分析 → 静态审计 → 十维评分 → 反证验证 → 动态验证 → 证据报告
+
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20WSL2%20%7C%20Linux-2F6FAD)](docs/wsl_dev_guide.md)
+[![Tests](https://img.shields.io/badge/tests-189%20passed-1D9E75)]()
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
+[![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
+
+*第一队 · 挑战杯「揭榜挂帅」· 具备自主决策能力的通用网络安全智能体*
+
+</div>
 
 ---
 
 ## 目录
 
-1. [项目简介](#1-项目简介)
-2. [核心特性](#2-核心特性)
-3. [快速开始（60 秒验收）](#3-快速开始60-秒验收)
-4. [系统架构](#4-系统架构)
-5. [目录结构](#5-目录结构)
-6. [在哪里使用](#6-在哪里使用)
-7. [安装与配置](#7-安装与配置)
-8. [使用方法](#8-使用方法)
-9. [流水线阶段详解](#9-流水线阶段详解)
-10. [Skill 体系](#10-skill-体系)
-11. [风险评分与结论模型](#11-风险评分与结论模型)
-12. [安全与合规](#12-安全与合规)
-13. [测试体系](#13-测试体系)
-14. [常见问题（FAQ）](#14-常见问题faq)
-15. [比赛现场使用指南](#15-比赛现场使用指南)
+- [项目简介](#项目简介)
+- [核心特性](#核心特性)
+- [快速开始（60 秒）](#快速开始60-秒)
+- [系统架构](#系统架构)
+- [环境配置：两条路任选](#环境配置两条路任选)
+  - [路线 A：Windows + WSL2](#路线-a-windows--wsl2推荐)
+  - [路线 B：纯 Linux](#路线-b-纯-linux)
+- [拿到固件后怎么做（完整流程）](#拿到固件后怎么做完整流程)
+  - [第 1 步 · 放置固件](#第-1-步--放置固件)
+  - [第 2 步 · 解包固件](#第-2-步--解包固件)
+  - [第 3 步 · 静态分析](#第-3-步--静态分析)
+  - [第 4 步 · 解读报告](#第-4-步--解读报告)
+  - [第 5 步 · 人工审计（10 问）](#第-5-步--人工审计10-问)
+  - [第 6 步 · 动态验证（可选）](#第-6-步--动态验证可选)
+- [CLI 命令参考](#cli-命令参考)
+- [配置说明](#配置说明)
+- [项目结构](#项目结构)
+- [Skill 体系](#skill-体系)
+- [评分与结论模型](#评分与结论模型)
+- [安全与合规](#安全与合规)
+- [测试](#测试)
+- [常见问题（FAQ）](#常见问题faq)
+- [许可证](#许可证)
 
 ---
 
-## 1. 项目简介
+## 项目简介
 
-**FirmHound（固件猎犬）** 是一套面向 IoT 固件漏洞挖掘的自动化流水线系统。它把「固件解包 → 攻击面排查 → 二进制反编译 → 静态数据流审计 → 十维风险评分 → 反证验证 → 本地动态验证 → 证据报告」这一完整流程封装为**可编排的 Skill + 确定性工具链**，支持 mock（纯规则离线）与 OpenAI-Compatible（国内备案模型）两种运行时，并以 9 个历史 CVE 金标准 Benchmark 持续回归验证。
+**FirmHound（固件猎犬）** 是一套面向 IoT 固件漏洞挖掘的自动化流水线系统：把「固件解包 → 攻击面排查 → 二进制分析 → 静态数据流审计 → 十维风险评分 → 反证验证 → 本地动态验证 → 证据报告」这一完整流程，封装为**可编排的 Skill 知识库 + 确定性 Python 工具链**。
 
-**设计目标**：比赛现场给出的 CVE 是**现场新给、未知的**，因此系统不依赖任何 CVE 特征硬编码，而是靠**通用规则 + 可复用 Skill** 发现未知漏洞——零先验知识即可从陌生固件中定位高危候选。
+**设计目标**：比赛现场给出的 CVE 是**现场新给、未知的**。因此系统不依赖任何 CVE 特征硬编码，而是靠**通用规则 + 可复用 Skill** 发现未知漏洞——零先验知识即可从陌生固件中定位高危候选。
 
 命名含义：**Firm**（Firmware 固件）+ **Hound**（猎犬），寓意像猎犬一样凭借敏锐嗅觉，追踪、挖掘固件中隐藏的漏洞。
 
-## 2. 核心特性
+## 核心特性
 
 | 特性 | 说明 |
 |---|---|
-| 全流程自动化 | M0–M14 十五模块，阶段机驱动（`fsa/orchestrator/engine.py`），可断点续跑（resume） |
-| 零 CVE 先验 | 通用规则 + Skill 知识驱动，不硬编码 CVE 特征，适配比赛现场新固件 |
-| 纯 Python 静态分析 | pyelftools + capstone 解析 ELF，Windows 可直跑，不强制依赖 Ghidra/objdump |
-| 双运行时 | `mock`（离线规则兜底）/ `openai_compatible`（DeepSeek 等国内备案模型，`config/models.yaml` 切换） |
-| 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型（confirmed / candidate / FP / unknown / observation） |
-| 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
-| 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），非武器化探针白名单 |
-| 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 20 节固定骨架 + 7 项合规扫描 + 脱敏渲染 |
-| 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，188 个单元测试持续守护 |
+| 🐾 全流程自动化 | M0–M14 模块化，阶段机驱动（`fsa/orchestrator/engine.py`），支持断点续跑 |
+| 🎯 零 CVE 先验 | 通用规则 + Skill 知识驱动，不硬编码 CVE 特征，适配现场新固件 |
+| 🐍 纯 Python 分析 | pyelftools + capstone 解析 ELF，Windows 可直跑，不强制依赖 Ghidra/objdump |
+| 🔌 双运行时 | `mock`（离线规则兜底） / `openai_compatible`（国内备案模型，`config/models.yaml` 一键切换） |
+| 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
+| 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
+| 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
+| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 20 节骨架 + 7 项合规扫描 + 脱敏 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，189 个单元测试持续守护 |
 
-## 3. 快速开始（60 秒验收）
+## 快速开始（60 秒）
 
 ```bash
-# ① 环境自检（Windows / Linux / WSL 均可）
-python scripts/dev.py test      # 预期：188 passed
-python scripts/dev.py lint      # 预期：All checks passed
+# ① 环境自检
+python scripts/dev.py test        # 预期 189 passed
+python scripts/dev.py lint        # 预期 All checks passed
 
 # ② 金标准回归（9 个历史 CVE → 评分 → 反证 → 报告）
 python scripts/run_pipeline.py --out-dir runs/pipeline --top-k 5
-# 产物：runs/pipeline/{ranking.json, verdicts.json, report.md}
 
-# ③ 未知固件演练（模拟比赛：构造仿真固件 → 自动解包 → 审计 → 报告）
+# ③ 未知固件演练（零 CVE 先验，检出 4 个植入漏洞）
 python scripts/run_e2e.py
-# 产物：runs/e2e/{analysis.json, report.md} — 零 CVE 先验检出 4 个植入漏洞
 ```
 
-## 4. 系统架构
+> ⚠️ 以上命令在 Windows 或 Linux 下均可运行；第 ③ 步如不传 `--rootfs` 会自动用内置仿真固件演示。**真实固件需要先解包**，见下文 [拿到固件后怎么做](#拿到固件后怎么做完整流程)。
+
+## 系统架构
 
 ```
                     ┌──────────────────────────────────────────┐
-                    │            WorkBuddy / 智能体             │
-                    │   Orchestrator（阶段机 + 决策记录）        │
-                    │   Planner / StateManager / HumanGate      │
+                    │           WorkBuddy / 智能体              │
+                    │  Orchestrator（阶段机 + 决策记录）         │
+                    │  Planner / StateManager / HumanGate       │
                     └───────────────┬──────────────────────────┘
                                     │ 统一 Runtime Adapter
                     ┌───────────────▼──────────────────────────┐
-                    │   fsa/runtime   mock │ openai_compatible │
+                    │   fsa/runtime  mock │ openai_compatible  │
                     │   SkillLoader / ToolRegistry / Budget     │
                     └───────────────┬──────────────────────────┘
         ┌───────────┬───────────────┼────────────────┬──────────┐
@@ -89,317 +109,415 @@ python scripts/run_e2e.py
               state/ evidence/ decisions/ artifacts/ + report.md
 ```
 
-**阶段机流转**（`fsa/orchestrator/engine.py`）：
+**阶段机流转**：`INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE → STATIC_ANALYSIS → RANK → VERIFY_TOP_K → {LOCAL_VALIDATION | REPORT} → DONE`
 
-```
-INIT → BASELINE → UNPACK → SURFACE → BINARY_TRIAGE → DECOMPILE
-     → STATIC_ANALYSIS → RANK → VERIFY_TOP_K → {LOCAL_VALIDATION | REPORT} → DONE
-```
+- `UNPACK` 部分失败 → fallback 到 `BINARY_TRIAGE`（无 rootfs 也能做 ELF 级分析）
+- 任一 required 阶段失败 → `ABORTED`，保留产物，可 `resume()` 续跑
 
-- `UNPACK` 部分失败 → fallback 到 `BINARY_TRIAGE`（无 rootfs 也能做 ELF 分析）
-- `VERIFY_TOP_K` 之后：full 深度且有 `NEED_DYNAMIC` 候选 → 走 `LOCAL_VALIDATION`，否则直通 `REPORT`
-- 任一 required 阶段失败 → `ABORTED`，保留已完成产物，可用 `resume()` 续跑
+---
 
-## 5. 目录结构
+## 环境配置：两条路任选
 
-```
-.
-├── fsa/                      # 核心包（编排/运行时/安全/Schema/报告）
-│   ├── orchestrator/         #   引擎、计划、状态机、人工门、Verifier
-│   ├── runtime/              #   Runtime Adapter、Skill Loader、工具注册表
-│   ├── safety/               #   安全策略引擎（路径/命令/IP 白名单）
-│   ├── schemas/              #   JSON Schema 加载器
-│   ├── reporting/            #   证据/决策存储
-│   ├── prompts/              #   Prompt 模板管理
-│   └── utils/                #   hashing / netcheck / jsonio / proc
-├── tools/                    # 确定性工具（每个都是可独立调用的函数）
-│   ├── firmware/             #   解包、信息收集、rootfs 评分、架构识别
-│   ├── filesystem/           #   目录清单、启动脚本解析
-│   ├── web/                  #   Webroot 枚举、handler 提取、UPnP、认证矩阵、攻击面
-│   ├── binary/               #   ELF 读取、安全特性、危险函数扫描、triage
-│   ├── analysis/             #   source-sink 规则、数据流、误报过滤、风险评分
-│   ├── emulation/            #   安全门、探针、QEMU user/system、FirmAE 封装
-│   ├── registry/             #   工具注册表（YAML 声明）
-│   └── wsl_wrappers/         #   Windows→WSL 工具桥接（binwalk/unsquashfs 等）
-├── skills/                   # Skill 知识库（SKILL.md，供智能体加载）
-│   ├── 00-orchestrator/      #   总控编排方法论
-│   ├── 01-unpack/            #   固件解包
-│   ├── 02-attack-surface/    #   攻击面枚举
-│   ├── 03-binary-decompile/  #   二进制反编译
-│   ├── 04-static-analysis/   #   静态审计
-│   ├── 04-audit/             #   command-injection / buffer-overflow 专项
-│   ├── 05-candidate-verifier/#   反证审查与五分类
-│   ├── 06-dynamic-validation/#   本地动态验证（含 qemu-service-bootstrap）
-│   └── 07-report/            #   报告生成
-├── schemas/                  # 9 个 JSON Schema + examples
-├── config/                   # 三件套配置（见第 7 节）
-├── benchmarks/CVEs/          # 9 个历史 CVE 金标准 fixture
-├── scripts/                  # CLI 入口（见第 8 节）
-├── tests/                    # 单元 / 集成 / fixture 测试
-├── docs/                     # 设计文档、WSL 开发指南
-├── legacy/                   # 原始手工 skill 归档
-└── runs/                     # 运行产物（report.md / *.json）
+> **核心原则**：静态分析层是**纯 Python**（pyelftools/capstone），Windows 直接跑；**解包与动态验证**依赖 Linux 工具链（binwalk / sasquatch / qemu）。所以有两条路：
+
+| 路线 | 适用人群 | 解包 | 静态分析 | 动态验证 |
+|---|---|---|---|---|
+| **A. Windows + WSL2** | 主力机是 Windows 的同学 | ✅ WSL2 内 | ✅ 任意一侧 | ✅ WSL2 内 |
+| **B. 纯 Linux** | 有 Linux 机器/服务器/云主机 | ✅ 原生 | ✅ 原生 | ✅ 原生 |
+
+---
+
+### 路线 A：Windows + WSL2（推荐）
+
+日常在 Windows 上操作，解包时通过 WSL2 调用 Linux 工具，全程无需切换系统。
+
+#### A1. 安装 WSL2
+
+```powershell
+# 以管理员身份打开 PowerShell，执行：
+wsl --install -d Ubuntu-22.04
 ```
 
-## 6. 在哪里使用
+> **注意**：安装后**必须重启电脑**。重启后 WSL 会自动完成 Ubuntu 初始化，并让你设置 Linux 用户名/密码（记好密码，后面 `sudo` 要用）。
 
-| 运行环境 | 用途 | 说明 |
-|---|---|---|
-| **Windows（推荐开发）** | 单元测试、静态分析流水线、金标准回归 | 纯 Python 实现，pyelftools/capstone 直接可用，无需 Linux 工具链 |
-| **WSL2 Ubuntu 22.04** | 完整解包、真实固件演练 | 需要 binwalk / sasquatch / unsquashfs / mksquashfs，参考 `docs/wsl_dev_guide.md` 与 `scripts/setup_wsl.sh` |
-| **Docker** | 一键容器化运行 | `python scripts/dev.py docker-build / docker-run`（需 Docker daemon） |
-| **决赛现场** | 比赛环境 | 使用 `openai_compatible` 运行时接国内备案模型（DeepSeek 等），mock 作为离线兜底 |
+验证：
 
-> Windows 下即使不装 WSL，也能跑通全部**单元测试**与**静态分析流水线**；只有「真实固件解包」和「QEMU 动态验证」需要 Linux 工具链。
+```powershell
+wsl -l -v
+# 应看到 Ubuntu-22.04，VERSION 列为 2（表示 WSL2，不是 WSL1）
+```
 
-## 7. 安装与配置
+> **如果 VERSION 是 1**：执行 `wsl --set-version Ubuntu-22.04 2` 升级到 WSL2。
 
-### 7.1 环境要求
+#### A2. 安装 Linux 工具链（一键脚本）
 
-- Python **≥ 3.11**（开发验证于 3.13）
-- pip + venv（推荐隔离环境）
-- （可选）Docker、WSL2 Ubuntu 22.04
+```powershell
+# 在 PowerShell 中执行（脚本会自动完成 apt 安装 + binwalk/sasquatch 编译）
+wsl -d Ubuntu-22.04 -- bash /mnt/c/Users/22067/Desktop/揭榜挂帅——网络安全/scripts/setup_wsl.sh
+```
 
-### 7.2 安装依赖
+> 脚本会安装：`binwalk`、`squashfs-tools`（unsquashfs/mksquashfs）、`sasquatch`（非标准 SquashFS）、`cpio`、`p7zip`、`qemu-user-static`、`strings/readelf/objdump` 等。
 
-```bash
-# 方式一：跨平台任务运行器（Windows 推荐）
-python scripts/dev.py dev        # 安装生产依赖 + 可编辑安装
+#### A3. 安装 Python 与项目依赖（Windows 侧）
 
-# 方式二：Makefile（Linux/macOS/WSL）
-make dev
+```powershell
+# 1) 安装 Python 3.11+（https://www.python.org/downloads/，勾选 "Add to PATH"）
 
-# 方式三：手动
+# 2) 进入项目目录，创建虚拟环境
+cd C:\Users\22067\Desktop\揭榜挂帅——网络安全
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
+
+# 3) 安装依赖
 pip install -r requirements.txt
 pip install -e .
 ```
 
-### 7.3 配置三件套（`config/`）
+#### A4. 验证两条路都通
 
-| 文件 | 作用 | 需要改吗 |
+```powershell
+# Windows 侧：单元测试
+python scripts/dev.py test
+
+# WSL 侧：工具链自检
+wsl -d Ubuntu-22.04 -- bash -lc "which binwalk unsquashfs sasquatch strings readelf"
+```
+
+#### A5. 常见问题（Windows + WSL2）
+
+| 问题 | 原因 | 解决 |
 |---|---|---|
-| `config/dev.yaml` | 主配置：默认 runtime、预算、路径、日志 | 默认即可 |
-| `config/models.yaml` | 模型运行时：`mock`（离线）与 `openai_compatible`（在线）的定义、token 预算 | 决赛前配好 API |
-| `config/safety.yaml` | 安全红线：路径白名单、命令黑名单、网络目标白名单 | **一般不要改** |
+| `wsl --install` 后重启仍报错 | WSL 内核/虚拟化未启用 | BIOS 开启虚拟化（VT-x/AMD-V）；PowerShell 执行 `bcdedit /set hypervisorlaunchtype auto` 后重启 |
+| `wsl -l -v` 显示 VERSION=1 | 默认 WSL1 | `wsl --set-version Ubuntu-22.04 2` |
+| WSL 报 `Wsl/Service/0x8007274c` | WSL 服务偶发抽风（已知问题） | `wsl --shutdown` 后重新进 |
+| WSL 里 `localhost` 访问不了 Windows 服务 | NAT 模式代理未镜像 | 属正常现象，不影响本工具（我们只用 WSL 跑命令行工具） |
+| `binwalk: command not found` | PATH 未含 `~/.local/bin` | WSL 内执行 `export PATH="$HOME/.local/bin:$PATH"`，或重跑 setup_wsl.sh |
+| Windows 侧 `python` 不是内部命令 | 未加入 PATH | 重装 Python 并勾选 "Add to PATH"，或使用完整路径 |
+| 解包目录在 Windows 侧打不开 | 解包产物含 Linux 符号链接 | 属正常，Windows 资源管理器无法显示符号链接；用 CLI 分析即可（已做符号链接容错） |
 
-**切换模型运行时**（`config/models.yaml`）：
+---
+
+### 路线 B：纯 Linux
+
+适合有 Linux 笔记本 / 服务器 / 云主机的同学，**一切原生，无需 WSL**。
+
+#### B1. 安装系统依赖
+
+```bash
+# Debian / Ubuntu 系
+sudo apt update && sudo apt install -y \
+    binwalk squashfs-tools cpio p7zip-full p7zip-rar file \
+    build-essential binutils qemu-user-static qemu-system-arm \
+    python3 python3-pip python3-venv python3-dev git
+
+# Fedora / RHEL 系
+sudo dnf install -y binwalk squashfs-tools cpio p7zip p7zip-plugins file \
+    gcc make binutils qemu-user-static qemu-system-arm python3 python3-pip git
+```
+
+#### B2. 安装 sasquatch（非标准 SquashFS，强烈建议）
+
+```bash
+cd /tmp
+git clone --depth 1 https://github.com/onekey-sec/sasquatch.git
+cd sasquatch
+make && sudo make install
+```
+
+> 很多路由固件用非标准 SquashFS（`squashfs:little endian` 变体），`unsquashfs` 解不了，必须用 sasquatch。
+
+#### B3. 安装 Python 与项目依赖
+
+```bash
+cd <项目路径>
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+#### B4. 验证
+
+```bash
+python scripts/dev.py test
+which binwalk unsquashfs sasquatch strings readelf
+```
+
+#### B5. 常见问题（纯 Linux）
+
+| 问题 | 原因 | 解决 |
+|---|---|---|
+| `binwalk -e` 解不出内容 | 固件加密 / 自定义头 | 换 `sasquatch` 手动解；或 `binwalk --extract --signature` 逐段看签名 |
+| `ModuleNotFoundError: No module named 'capstone'` | 依赖没装 | `pip install -r requirements.txt` 重装 |
+| `Permission denied` 运行脚本 | 可执行位缺失 | `chmod +x scripts/*.sh` |
+| QEMU 缺架构 | 不同架构固件需不同 qemu | `sudo apt install qemu-user-static`（已含常见架构） |
+| `pip` 报 externally-managed-environment | 新版 Debian/Ubuntu 限制 | 用 venv（本项目推荐），或 `pip install --break-system-packages` |
+
+---
+
+## 拿到固件后怎么做（完整流程）
+
+> 这是最核心的一节。假设你刚从官网下载了一个固件（如 `DIR859_FW102b03.bin`），按下面 6 步走。
+
+### 第 1 步 · 放置固件
+
+把固件文件放到项目目录下的 **`firmware_samples/`** 文件夹：
+
+```
+<项目根目录>/
+├── firmware_samples/
+│   └── DIR859_FW102b03.bin     ← 你的固件放这里
+├── tmp/                        ← 解包产物（自动创建）
+└── runs/                       ← 分析报告（自动创建）
+```
+
+> **为什么必须放这里？** 安全策略（`config/safety.yaml`）只允许工具读写白名单目录：`runs/`、`tmp/`、`tests/fixtures/`、`firmware_samples/`。放别处会被 `Policy rejected` 拦截。
+
+### 第 2 步 · 解包固件
+
+固件是"打包文件"，先解出里面的文件系统（rootfs）。
+
+**Windows + WSL2 路线**（PowerShell 执行）：
+
+```powershell
+wsl -d Ubuntu-22.04 -- bash -lc "cd /mnt/c/Users/<你的用户名>/Desktop/揭榜挂帅——网络安全 && binwalk -e -M firmware_samples/DIR859_FW102b03.bin -C /mnt/c/Users/<你的用户名>/Desktop/揭榜挂帅——网络安全/tmp/unpacked"
+```
+
+**纯 Linux 路线**：
+
+```bash
+cd <项目路径>
+binwalk -e -M firmware_samples/DIR859_FW102b03.bin -C tmp/unpacked
+```
+
+参数说明：
+- `-e` 提取；`-M` 递归提取（固件里可能有嵌套压缩层）
+- `-C` 指定输出目录
+
+**找到 rootfs**：解包后通常出现 `tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root`，里面应有 `bin/`、`etc/`、`usr/`、`www/`（或 `htdocs/`）等目录——**这就是分析目标 rootfs**。
+
+```bash
+# 找不到 squashfs-root 时，列出解包结果
+ls tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/
+
+# 备用：sasquatch 手动解
+sasquatch -d tmp/squashfs-root firmware_samples/DIR859_FW102b03.bin
+```
+
+### 第 3 步 · 静态分析
+
+**Windows 或 Linux 均可**（纯 Python，无需 WSL）：
+
+```bash
+python scripts/run_e2e.py --rootfs <rootfs路径> --out-dir runs/<本次任务名>
+```
+
+**Windows 示例**：
+
+```powershell
+python scripts/run_e2e.py --rootfs "C:\Users\22067\Desktop\揭榜挂帅——网络安全\tmp\unpacked\_DIR859_FW102b03.bin-0.extracted\squashfs-root" --out-dir runs\dir859_run1
+```
+
+**Linux 示例**：
+
+```bash
+python scripts/run_e2e.py --rootfs "tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root" --out-dir runs/dir859_run1
+```
+
+运行结束会打印报告，并保存到 `runs/dir859_run1/report.md`。
+
+### 第 4 步 · 解读报告
+
+打开 `runs/dir859_run1/report.md`，重点看三块：
+
+```markdown
+# 固件端到端静态分析报告
+- ELF 二进制: 113        ← 固件里有多少可执行程序
+- 检出候选: 29           ← 疑似漏洞数量
+
+## 检出候选（命令注入）
+| 候选 | 二进制 | Sink | 分数 | 等级 |
+| e2e-elf-fileaccess.cgi | htdocs\fileaccess.cgi | system | 23 | HIGH |
+| e2e-elf-httpd          | sbin\httpd           | system | 23 | HIGH |
+```
+
+**判读口诀**：
+- **分数**：≥24 CRITICAL / 18–23 HIGH / 12–17 MEDIUM / <12 LOW
+- **Sink**：`system` / `popen` / `eval` 是命令执行信号；`strcpy` / `sprintf` 是溢出信号
+- **优先审 HIGH 以上**：通常 29 个候选里只有少数是真漏洞，其余是系统程序自带的正常 `system` 调用（误报），需要人工过滤
+
+### 第 5 步 · 人工审计（10 问）
+
+CLI 负责"找可疑点"，**人工审计负责"确认真漏洞"**。对每个 HIGH 以上候选逐条回答：
+
+| # | 问题 | 验证手段 |
+|---|---|---|
+| 1 | 输入真的来自外部？ | HTTP 参数 / Header / Cookie / SOAP？还是常量？ |
+| 2 | 攻击者能控制吗？ | 请求里能否任意设置该值？ |
+| 3 | 真的到危险函数了？ | 反汇编：`objdump -d fileaccess.cgi | grep -A5 "jal.*system"` |
+| 4 | 中间有过滤吗？ | 白名单 / 黑名单 / 长度检查？ |
+| 5 | 调用链可达吗？ | 该 handler 被 httpd 路由注册了吗？ |
+| 6 | 程序启动了吗？ | `etc/init.d/` 或 `rcS` 里有它吗？ |
+| 7 | 需要认证吗？ | 登录后才可达？有认证绕过？ |
+| 8 | 是调试功能吗？ | 函数名含 debug/test/diag？ |
+| 9 | 有平台限制吗？ | 编译开关 / 特定硬件才走此路径？ |
+| 10 | 有矛盾证据吗？ | 证据库里有没有反证？ |
+
+**辅助命令**（WSL 或 Linux 内）：
+
+```bash
+strings <binary> | grep -E "system|popen|%s|reboot"   # 找命令模板
+objdump -d <binary> | grep -A5 "jal.*system"           # 找调用点（MIPS）
+readelf -s <binary> | grep system                       # 确认导入
+```
+
+**判定规则**：
+- 10 问全过 → `confirmed-issue`（确认漏洞）
+- 有认证/过滤但可绕过 → `high-confidence-candidate`
+- 任一项不满足 → 降级或 `false-positive`，**别硬报**
+
+### 第 6 步 · 动态验证（可选）
+
+想在 QEMU 里证明漏洞真的能触发：
+
+```bash
+# WSL 或 Linux 内，qemu 用户态模式（适合单程序）
+qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
+```
+
+**红线（必须遵守）**：
+- 只打自己下载的固件，目标 IP 必须私有网段（`192.168.x.x` / `10.x.x.x`）
+- 只发无害 payload（`id`、`touch /tmp/lab_marker`）
+- **禁止**反弹 shell、持久化、下载执行、真实攻击流量
+
+---
+
+## CLI 命令参考
+
+| 命令 | 用途 | 产物 |
+|---|---|---|
+| `python scripts/dev.py test` | 跑全部单元测试 | — |
+| `python scripts/dev.py lint` | ruff 代码检查 | — |
+| `python scripts/dev.py format` | 自动格式化 | — |
+| `python scripts/run_pipeline.py --out-dir runs/pipeline --top-k 5` | 金标准回归（9 个 CVE） | `ranking.json` / `verdicts.json` / `report.md` |
+| `python scripts/run_e2e.py --rootfs <rootfs> --out-dir runs/xxx` | **真实固件分析（核心）** | `analysis.json` / `report.md` |
+| `python scripts/demo_rank.py --out-dir runs/demo` | 评分排序演示 | `ranking.json` / `ranking.md` |
+| `bash scripts/setup_wsl.sh`（WSL 内） | 一键装 Linux 工具链 | — |
+
+## 配置说明
+
+| 文件 | 作用 | 默认即用？ |
+|---|---|---|
+| `config/dev.yaml` | 主配置：runtime / 路径 / 日志 | ✅ |
+| `config/models.yaml` | 模型运行时（mock / openai_compatible）与预算 | ✅（mock 默认） |
+| `config/safety.yaml` | 安全红线（路径白名单 / 命令黑名单 / 网络白名单） | ✅（**不要改**） |
+| `.env` | 模型 API Key 等环境变量（参考 `.env.example`） | 可选 |
+
+**启用 LLM 运行时**（决赛场景）：
 
 ```yaml
+# config/models.yaml
 runtimes:
-  mock:                    # 离线规则兜底（默认，无外部调用）
-    provider: mock
-  openai_compatible:       # 决赛环境：国内备案模型
+  openai_compatible:
     provider: openai
-    base_url: https://api.deepseek.com/v1
+    base_url: https://api.deepseek.com/v1   # 或你的国内备案模型端点
     model: deepseek-chat
-    timeout: 60
-    max_retries: 3
-    api_key_env: OPENAI_API_KEY   # 从环境变量读取
+    api_key_env: OPENAI_API_KEY
 ```
-
-启用在线模型时设置环境变量（或在 `.env` 中声明，参考 `.env.example`）：
 
 ```bash
-export OPENAI_API_KEY=sk-xxx        # Windows PowerShell: $env:OPENAI_API_KEY="sk-xxx"
+export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xxx"
 ```
 
-**预算控制**（`models.yaml` → `budgets`）：`default` 档（10 万 token / 阶段 2 万 / 单阶段 50 次调用）与 `quick` 档，超限自动停止，防止模型失控调用。
-
-### 7.4 （可选）WSL 工具链
-
-真实固件解包需要 Linux 工具：`binwalk`、`sasquatch`、`unsquashfs`、`mksquashfs`。
-
-```bash
-wsl -d Ubuntu-22.04
-cd /mnt/c/Users/<你的路径>/揭榜挂帅——网络安全
-bash scripts/setup_wsl.sh          # 自动安装工具链
-python scripts/wsl_smoke.py        # 诊断 WSL 工具是否就绪
-```
-
-Windows 侧通过 `tools/wsl_wrappers/*.bat` 自动桥接 WSL（`wsl_tool_runner.py` 负责路径转换），无需手动切 shell。
-
-## 8. 使用方法
-
-### 8.1 开发任务运行器 `scripts/dev.py`
-
-```bash
-python scripts/dev.py help        # 查看全部命令
-python scripts/dev.py test        # 跑全部测试（pytest，Windows 自动加 WSL 桥接 PATH）
-python scripts/dev.py lint        # ruff 代码检查
-python scripts/dev.py format      # ruff 自动格式化
-python scripts/dev.py smoke       # CLI 冒烟测试（需 tests/fixtures/sample.bin）
-python scripts/dev.py clean       # 清理缓存
-python scripts/dev.py docker-build / docker-run
-```
-
-### 8.2 金标准流水线 `scripts/run_pipeline.py`
-
-对 `benchmarks/CVEs/` 的 9 个历史 CVE 跑「评分 → 排序 → Top-K 选取 → 反证验证 → 报告」：
-
-```bash
-python scripts/run_pipeline.py --out-dir runs/pipeline --top-k 5
-```
-
-产物：
-- `runs/pipeline/ranking.json` — 全量排序（rank / risk_score / risk_level / CVE 元数据）
-- `runs/pipeline/verdicts.json` — Verifier 10 问反证裁决
-- `runs/pipeline/report.md` — 人类可读报告
-
-### 8.3 未知固件演练 `scripts/run_e2e.py`（模拟比赛现场）
-
-对任意已解包 rootfs 执行完整静态分析（inventory → webroot → startup → ELF triage → 命令注入检测 → 评分 → 报告），**无需任何 CVE 先验**：
-
-```bash
-# 有真实 rootfs：
-python scripts/run_e2e.py --rootfs <你的rootfs目录>
-
-# 没有固件样本时，自动构建含 4 个植入漏洞的仿真固件再演练：
-python scripts/run_e2e.py
-```
-
-产物：`runs/e2e/{analysis.json, report.md}`。
-
-### 8.4 评分排序演示 `scripts/demo_rank.py`
-
-```bash
-python scripts/demo_rank.py --out-dir runs/demo
-# 产物：runs/demo/ranking.{json,md}
-```
-
-### 8.5 产物目录约定
+## 项目结构
 
 ```
-runs/<run_id>/
-├── state/task_card.json        # 任务卡
-├── state/plan.json             # 执行计划
-├── state/run_state.json        # 运行状态（可 resume）
-├── evidence/*.json             # 证据链
-├── decisions/*.json            # 决策记录
-└── artifacts/                  # 阶段产物
+.
+├── fsa/                    # 核心包：orchestrator / runtime / safety / schemas / reporting / prompts / utils
+├── tools/                  # 确定性工具：firmware(解包) / filesystem / web(攻击面) / binary / analysis / emulation
+├── skills/                 # Skill 知识库（9 个 SKILL.md 包，00-07）
+├── schemas/                # 9 个 JSON Schema + examples
+├── config/                 # dev.yaml / models.yaml / safety.yaml
+├── benchmarks/CVEs/        # 9 个历史 CVE 金标准 fixture
+├── scripts/                # CLI 入口（dev / run_pipeline / run_e2e / demo_rank / setup_wsl）
+├── firmware_samples/       # ← 固件放置目录
+├── tmp/                    # 解包产物
+├── runs/                   # 分析报告与 JSON 产物
+├── tests/                  # 单元 / 集成测试（189 passed）
+└── docs/                   # 设计文档、WSL 指南、挖洞教程
 ```
 
-## 9. 流水线阶段详解
-
-| 阶段 | 模块 | 关键产物 | Skill |
-|---|---|---|---|
-| M1 任务理解 | `orchestrator/planner.py` | task_card.json / plan.json | — |
-| M2 固件解包 | `tools/firmware/*` | firmware_manifest.json / rootfs | 01-unpack |
-| M3 攻击面 | `tools/web/*` | attack_surface.json | 02-attack-surface |
-| M4 二进制 triage | `tools/binary/*` | binary_summary（triage_score） | 03-binary-decompile |
-| M5 静态审计 | `tools/analysis/*` | candidates.json（source→sink 数据流） | 04-static-analysis / 04-audit |
-| M6 风险评分 | `tools/analysis/risk_score.py` | ranking.json（十维评分） | — |
-| M7 反证验证 | `orchestrator/verifier.py` | verdicts.json（五分类） | 05-candidate-verifier |
-| M8 动态验证 | `tools/emulation/*` | dynamic_validation.json（L0–L3） | 06-dynamic-validation |
-| M9 证据链 | `reporting/evidence_store.py` | evidence/ 索引 | — |
-| M10 报告 | `fsa/report/` + Skill 07 | report.md + final_verdict.json | 07-report |
-
-## 10. Skill 体系
-
-9 个 Skill 包把领域知识沉淀为结构化 `SKILL.md`（含「输入/输出/执行流程/失败降级路径/验收标准」五节），供智能体加载复用：
+## Skill 体系
 
 | Skill | 领域 | 关键知识 |
 |---|---|---|
 | 00-orchestrator | 总控编排 | 阶段机、深度档位、决策可审计 |
-| 01-unpack | 固件解包 | binwalk 无签名降级、魔数表、rootfs 评分 |
+| 01-unpack | 固件解包 | binwalk 降级、魔数表、rootfs 评分 |
 | 02-attack-surface | 攻击面 | Web/UPnP/CGI 枚举、认证矩阵三层交叉 |
 | 03-binary-decompile | 二进制分析 | 架构识别、Ghidra 降级路径 |
 | 04-static-analysis | 静态审计 | 命令注入五步法、协议解析六步法 |
 | 04-audit | 专项审计 | command-injection / buffer-overflow 复现经验 |
-| 05-candidate-verifier | 反证审查 | 10 问清单、12 条硬判定规则 |
+| 05-candidate-verifier | 反证审查 | 10 问清单、12 条硬判定 |
 | 06-dynamic-validation | 动态验证 | L0–L3 分层、qemu-user 三大坑、安全门 |
-| 07-report | 报告生成 | 20 节骨架、7 项合规扫描、脱敏渲染 |
+| 07-report | 报告生成 | 20 节骨架、7 项合规扫描、脱敏 |
 
-## 11. 风险评分与结论模型
+## 评分与结论模型
 
-**十维评分**（`tools/analysis/risk_score.py`，每维 0–3，满分 30）：
+**十维评分**（每维 0–3，满分 30）：`P` 预认证可达性 · `I` 输入来源 · `U` 用户可控性 · `D` 危险函数可达 · `C` 字符串拼接 · `S` Shell 上下文 · `W` 文件写入 · `K` 配置持久化 · `V` 输入验证(反向) · `T` 可测试性。
 
-| 维 | 含义 | 维 | 含义 |
-|---|---|---|---|
-| P | 预认证可达性 | S | Shell 上下文 |
-| I | 输入来源 | W | 文件写入 |
-| U | 用户可控性 | K | 配置持久化 |
-| D | 危险函数可达 | V | 输入验证（反向） |
-| C | 字符串拼接 | T | 可测试性 |
+阈值：**≥24 CRITICAL / 18–23 HIGH / 12–17 MEDIUM / <12 LOW**。
 
-分级阈值：**≥24 CRITICAL / 18–23 HIGH / 12–17 MEDIUM / <12 LOW**。每维必须引用证据 ID，无证据记 0 并标注。
+**五分类结论**：`confirmed-issue`（确认） / `high-confidence-candidate`（高置信） / `false-positive`（误报） / `unknown`（未知） / `observation`（观察）。
 
-**五分类结论**（M7 Verifier 输出）：
+**裁决动作**：`ACCEPT`（采纳） / `DOWNGRADE`（降级） / `REJECT`（拒绝） / `NEED_DYNAMIC`（需动态验证）。
 
-| 类别 | 含义 |
-|---|---|
-| `confirmed-issue` | 确认问题：外部输入 → 可控 → 真实 sink → 可达链，无有效过滤 |
-| `high-confidence-candidate` | 高置信候选：核心链路成立，存在 minor 限制（需认证/可绕过过滤） |
-| `false-positive` | 误报：非外部输入、不可控、未达 sink、仅调试功能 |
-| `unknown` | 未知：关键事实缺失，无法可靠判断 |
-| `observation` | 观察：仅发现危险 API / 可疑字符串，缺完整链路 |
+## 安全与合规
 
-裁决动作：**ACCEPT（采纳）/ DOWNGRADE（降级）/ REJECT（拒绝）/ NEED_DYNAMIC（需动态验证）**。
+1. **命令黑名单**：`rm -rf`、`curl/wget`、`bash -i` 一律拒绝
+2. **路径白名单**：仅 `runs/`、`tmp/`、`tests/fixtures/`、`firmware_samples/`；`.env`/`secrets/` 禁止读写
+3. **网络隔离**：仅私有网段与 `127.0.0.1`；动态验证目标非私有 → `ABORT_DYNAMIC_VALIDATION`
+4. **动态验证四门**：`AUTHORIZED && LOCAL_LAB && PRIVATE_NETWORK && BASELINE_READY`
+5. **非武器化探针**：只允许 `touch/echo/id/uname`；反弹 shell / 持久化 / 下载执行一律拒绝
+6. **报告合规 7 项**：无真实 IP / 无反弹 Shell / 无持久化 / 无下载执行 / 无破坏性命令 / 含安全声明 / 仅标记验证
 
-## 12. 安全与合规
-
-本项目面向比赛与授权审计场景，内置多层安全约束：
-
-1. **命令黑名单**（`config/safety.yaml`）：`rm -rf`、`curl/wget`（外联必须走受控通道）、`bash -i`、`python -m http.server` 一律拒绝。
-2. **路径白名单**：工具只能读写 `runs/`、`tmp/`、`tests/fixtures/`、`firmware_samples/` 等白名单目录；`.env`、`secrets/`、`config/safety.yaml` 禁止读写。
-3. **网络隔离**：`network.allow_public: false`，仅允许私有网段与 `127.0.0.1/localhost`；动态验证目标 IP 非私有 → `ABORT_DYNAMIC_VALIDATION`，零外发流量。
-4. **动态验证四门**（`tools/emulation/safety_gate.py`）：`AUTHORIZED && LOCAL_LAB && PRIVATE_NETWORK && BASELINE_READY` 全过才放行。
-5. **非武器化探针**（`tools/emulation/probes.py`）：只允许 `touch/echo/id/uname` 等无害标记；反弹 shell、持久化、下载执行一律拒绝。
-6. **报告合规 7 项**（Skill 07）：无真实 IP / 无反弹 Shell 特征 / 无持久化 / 无下载执行 / 无破坏性命令 / 含安全声明 / 仅标记验证；并做脱敏渲染（`<USER_INPUT>`、`<BENIGN_MARKER>` 占位）。
-
-## 13. 测试体系
+## 测试
 
 ```bash
-python scripts/dev.py test      # 全部测试
-python scripts/dev.py lint      # 静态检查（ruff，含 E/F/W/I/UP/B/C4/SIM 规则）
+python scripts/dev.py test    # 189 passed
+python scripts/dev.py lint    # ruff 全绿
 ```
 
-- **单元测试**：188 passed（Schema / 工具 / 编排 / Verifier / 评分 / 动态验证 / Skill 加载 / e2e 全链路）
-- **集成测试**：`tests/integration/`（解包、攻击面，依赖 WSL/Docker 时自动 skip）
-- **金标准回归**：`tests/unit/test_benchmark_fixtures.py` 校验 9 个 CVE fixture 全部符合 Schema
+- 单元测试覆盖：Schema / 工具 / 编排 / Verifier / 评分 / 动态验证 / Skill 加载 / e2e
+- 金标准回归：9 个 CVE fixture 全部通过 Schema 校验
+- 集成测试：`tests/integration/`（解包/攻击面，依赖 WSL/Docker 时自动 skip）
 
-## 14. 常见问题（FAQ）
+## 常见问题（FAQ）
 
-**Q1：Windows 上没有 binwalk / unsquashfs，能跑吗？**
-能。单元测试与静态分析流水线全部纯 Python（pyelftools/capstone）；只有真实固件解包需要 WSL 工具链，Windows 会通过 `tools/wsl_wrappers/` 自动桥接，工具缺失时自动降级（记录 limitation，不崩溃）。
+**Q1：Windows 上没有 binwalk，能跑吗？**
+能。单元测试与静态分析是纯 Python；只有真实固件解包需要 Linux 工具，用 WSL2 一条命令解包后，Windows 侧分析。
 
-**Q2：怎么接入比赛要求的国产大模型？**
-编辑 `config/models.yaml` 的 `openai_compatible` 段（base_url / model / api_key_env），设置 `OPENAI_API_KEY` 环境变量，并把 `config/dev.yaml` 的 `runtime.default` 改为 `openai_compatible`。模型不可用时自动回退 `mock` 规则模式。
+**Q2：解包时符号链接报错 / 目录打不开？**
+真实固件 rootfs 含 Linux 符号链接（如 `tmp -> /dev/null`），Windows 无法 stat。CLI 已做符号链接容错（`fsa/utils/traverse.py`），直接分析即可，无需手动清理。
 
-**Q3：比赛现场给的是新固件 + 新 CVE，系统能发现吗？**
-可以。系统不依赖任何 CVE 特征硬编码：`run_e2e.py` 演练证明，零 CVE 先验下通用规则能自动检出 4 个植入命令注入（httpd/upnpd=23 HIGH、2 CGI=21 HIGH）。现场流程 = 解包 → 攻击面 → ELF triage → 静态审计 → 评分 → 反证 → 报告。
+**Q3：怎么接入国产大模型？**
+编辑 `config/models.yaml` 的 `openai_compatible` 段，设置 `OPENAI_API_KEY` 环境变量，`config/dev.yaml` 的 `runtime.default` 改为 `openai_compatible`。模型不可用时自动回退 mock。
 
-**Q4：怎么查看验收结果？**
-`runs/pipeline/report.md` 与 `runs/e2e/report.md` 为人类可读报告；`ranking.json` / `verdicts.json` 为机器可读结果；把 report.md 交给 WorkBuddy 可转换为可视化页面预览。
+**Q4：比赛现场给新固件，系统能发现漏洞吗？**
+能。系统不依赖 CVE 特征硬编码：`run_e2e.py` 演练证明零 CVE 先验可检出植入命令注入。现场流程 = 放置固件 → 解包 → 分析 → 人工审计 → 报告。
 
 **Q5：报告里会不会出现可武器化内容？**
-不会。Skill 07 强制 7 项合规扫描 + 脱敏渲染，报告中真实 IP、反弹 shell、持久化、下载执行等内容会被占位符替换；全 REJECT 时如实输出「未发现强证据」。
+不会。Skill 07 强制 7 项合规扫描 + 脱敏渲染，真实 IP / 反弹 shell 等以占位符替代。
 
-**Q6：WSL 服务不稳定（0x8007274c）怎么办？**
-`wsl --shutdown` 后重试；Windows 侧测试建议用 `python scripts/dev.py test`（自动加桥接 PATH），如仍挂起可只在 WSL 内跑 `pytest`。详见 `docs/wsl_dev_guide.md`。
+**Q6：WSL 服务不稳定（0x8007274c）？**
+`wsl --shutdown` 后重试；或直接改用纯 Linux 路线（路线 B）。
 
-## 15. 比赛现场使用指南
+**Q7：怎么查看报告？**
+`runs/<任务名>/report.md` 是 Markdown；`analysis.json` 是结构化结果。也可以把 report.md 交给 WorkBuddy 渲染成网页。
 
-**赛前准备（一次性）**
-1. 按第 7 节配置好 venv 依赖与模型 API，验证 `test` / `lint` 通过。
-2. 用 `run_pipeline.py` 跑一遍金标准回归，确认 9 个 CVE 评分分级正确。
-3. 跑一遍 `run_e2e.py` 演练，熟悉新固件流程与产物位置。
-4. 打印/熟记 10 维评分规则、五分类口径、安全门含义（答辩问答高频点）。
+## 许可证
 
-**现场流程（拿到新固件后）**
-1. `python scripts/run_e2e.py --rootfs <rootfs>`（若现场提供已解包目录）或先解包。
-2. 检查 `report.md`：候选排行 → 反证裁决 → 确认高危候选的 source→sink 证据链。
-3. 对 `NEED_DYNAMIC` 候选，确认安全门四项后跑动态验证补证据。
-4. 用 Skill 07 生成最终报告，脱敏后提交。
-
-**答辩亮点（对应评分维度）**
-- **决策可解释**：每个阶段有决策记录（options/selected/reason/confidence/actor），报告 20 节证据链完整。
-- **工具协同**：Skill 知识库 + 确定性工具 + 双运行时，三层协同架构。
-- **创新**：零 CVE 先验的通用规则挖掘（未知固件 drill 实证）、反证优先验证、十维证据驱动评分。
-- **任务理解**：流水线严格对齐赛题「自主决策 + 安全合规」要求，动态验证全程安全门约束。
+MIT © 第一队 · 挑战杯「揭榜挂帅」专项赛
 
 ---
 
-*FirmHound · 固件猎犬 — 第一队 · 挑战杯揭榜挂帅「具备自主决策能力的通用网络安全智能体」赛题作品*
-*内部包名/CLI 标识沿用 `fsa`（Firmware Security Agent），README 与产品命名统一为 FirmHound。*
+*FirmHound · 固件猎犬 — 用确定性工具发现漏洞，用证据链赢得信任。*
