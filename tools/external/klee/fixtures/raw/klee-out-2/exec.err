@@ -1,0 +1,1 @@
+KLEE: ERROR: external call "gets" is not supported

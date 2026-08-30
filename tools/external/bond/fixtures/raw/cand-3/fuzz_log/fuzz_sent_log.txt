@@ -1,0 +1,2 @@
+SENT: GET /goform/SetWan?Save=1&Mode=General
+TIMEOUT after 600s; fuzzing aborted

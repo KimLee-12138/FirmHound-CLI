@@ -1,0 +1,37 @@
+{
+  "finding_id": "satc-bin-httpd-0x40a1b0",
+  "tool": "satc",
+  "tool_version": "NSSL-SJTU/SaTC@1dfdcdc",
+  "run_id": "run-e2e-satc-demo",
+  "binary_id": "bin/httpd",
+  "vuln_class": "command_injection",
+  "entry_point": {
+    "type": "http",
+    "method": "POST",
+    "path": "/goform/formexeCommand",
+    "params": ["cmdinput", "QUERY_STRING"]
+  },
+  "source": {
+    "type": "http_query",
+    "name": "QUERY_STRING",
+    "evidence": "keyword_extract_result/detail/Prar_detail.result:12"
+  },
+  "sink": {
+    "function": "system",
+    "addr": "0x40a1b0",
+    "type": "command_execution"
+  },
+  "call_trace": [
+    {"addr": "0x40a120", "func": "formexeCommand", "note": "entry handler"},
+    {"addr": "0x40a17c", "func": "sprintf", "note": "format builder"},
+    {"addr": "0x40a1b0", "func": "system", "note": "sink"}
+  ],
+  "constraints": [
+    {"param": "cmdinput", "semantic": "null_check", "expr": "!=null", "klass": "mandatory"}
+  ],
+  "confidence": 0.9,
+  "status": "ok",
+  "raw_ref": "artifacts/satc/result-httpd-ref2sink_cmdi-ctW8.txt",
+  "duration_s": 1847.5,
+  "notes": "taint_check enabled; keyword clustered to bin/httpd"
+}

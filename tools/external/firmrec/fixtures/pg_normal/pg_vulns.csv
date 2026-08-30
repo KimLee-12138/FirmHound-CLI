@@ -1,0 +1,3 @@
+﻿binary,addr,function,vuln_class,similarity,matched_cve,source
+bin/httpd,0x40a1b0,system,command_injection,0.92,CVE-2017-17215,QUERY_STRING
+bin/upnpd,0x40b2c0,strcpy,overflow,0.81,CVE-2021-31802,User-Agent

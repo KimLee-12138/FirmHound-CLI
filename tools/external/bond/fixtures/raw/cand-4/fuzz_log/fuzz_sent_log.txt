@@ -1,0 +1,2 @@
+SENT: GET /goform/SetWan?Save=0&Mode=General
+SENT: GET /goform/SetWan?Save=1&Mode=Other

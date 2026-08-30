@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fsa.example/schemas/external_finding.schema.json",
+  "title": "External Analyzer Finding",
+  "description": "Normalized finding produced by an external analyzer (satc / firmrec / klee / bond). Every external tool must normalize its raw output into this format before it can enter the finding_fusion layer.",
+  "type": "object",
+  "required": [
+    "finding_id",
+    "tool",
+    "binary_id",
+    "vuln_class",
+    "source",
+    "sink",
+    "confidence",
+    "status",
+    "run_id"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "description": "Globally unique within a run. Convention: {tool}-{binary_slug}-{addr}"
+    },
+    "tool": {"enum": ["satc", "firmrec", "klee", "bond"]},
+    "tool_version": {"type": "string"},
+    "run_id": {"type": "string"},
+    "binary_id": {
+      "type": "string",
+      "description": "Path relative to the rootfs. MUST use the same normalization as candidate.binary_id so the fusion layer can join them."
+    },
+    "vuln_class": {
+      "enum": [
+        "command_injection",
+        "overflow",
+        "path_traversal",
+        "auth_bypass",
+        "config_injection",
+        "format_string",
+        "other"
+      ]
+    },
+
+    "entry_point": {
+      "type": "object",
+      "properties": {
+        "type": {"enum": ["http", "upnp", "soap", "socket", "cli", "unknown"]},
+        "method": {"type": "string"},
+        "path": {"type": "string"},
+        "params": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "http_param",
+            "http_header",
+            "http_cookie",
+            "http_body",
+            "http_query",
+            "soap_arg",
+            "socket_buffer",
+            "file_upload",
+            "environment",
+            "nvram",
+            "config",
+            "unknown"
+          ]
+        },
+        "name": {"type": "string"},
+        "evidence": {"type": "string"}
+      }
+    },
+    "sink": {
+      "type": "object",
+      "properties": {
+        "function": {"type": "string"},
+        "addr": {
+          "type": "string",
+          "description": "Lowercase hex with no leading zeros, e.g. 0x40a1b0"
+        },
+        "type": {
+          "enum": [
+            "command_execution",
+            "memory_copy",
+            "format_output",
+            "file_write",
+            "config_write",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "call_trace": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "addr": {"type": "string"},
+          "func": {"type": "string"},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "description": "Path constraints produced by KLEE / BOND, consumed by directed fuzzing and priority mutation.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "param": {"type": "string"},
+          "semantic": {
+            "enum": [
+              "string_eq",
+              "string_contains",
+              "numeric_range",
+              "null_check",
+              "length_bound",
+              "byte_check",
+              "net_format",
+              "other"
+            ]
+          },
+          "expr": {"type": "string"},
+          "klass": {"enum": ["mandatory", "partial", "none"]}
+        }
+      }
+    },
+
+    "symex": {
+      "type": "object",
+      "description": "KLEE-specific: symbolic path feasibility result.",
+      "properties": {
+        "reachable": {
+          "type": ["boolean", "null"],
+          "description": "true reachable / false infeasible / null undetermined"
+        },
+        "reason": {
+          "enum": [
+            "ok",
+            "infeasible",
+            "timeout",
+            "path_explosion",
+            "unsupported_arch",
+            "error"
+          ]
+        },
+        "witness_input": {
+          "type": ["object", "null"],
+          "description": "Concrete input that reaches the sink. Must be sanitized."
+        },
+        "harness_version": {
+          "type": "string",
+          "description": "Required for traceability. A false/infesible verdict is only valid under the modelling assumptions of this harness version."
+        },
+        "stats": {"type": "object"}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "BOND-specific: directed-fuzzing validation result.",
+      "properties": {
+        "triggered": {"type": ["boolean", "null"]},
+        "probe": {"enum": ["marker", "crash", "timeout", "none"]},
+        "poc_sanitized": {
+          "type": "boolean",
+          "description": "Hard gate: must be true before the finding may be persisted or rendered into a report."
+        }
+      }
+    },
+
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "status": {"enum": ["ok", "skipped", "failed", "timeout", "unsafe"]},
+    "limitation": {
+      "type": "string",
+      "description": "Mandatory when status is not ok: explain what degraded and why."
+    },
+    "raw_ref": {
+      "type": "string",
+      "description": "Path relative to run_dir pointing at the raw artifact backing this finding."
+    },
+    "duration_s": {"type": "number", "minimum": 0},
+    "notes": {"type": "string"},
+
+    "matched_cve": {
+      "type": "string",
+      "description": "FirmRec-specific: which known vulnerability signature matched. Presence marks this finding as NOT zero-prior."
+    },
+    "external_only": {
+      "type": "boolean",
+      "description": "Set by the fusion layer when the main track did not report this candidate."
+    }
+  },
+  "additionalProperties": true
+}

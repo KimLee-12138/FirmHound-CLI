@@ -1,0 +1,3 @@
+KLEE: ERROR: memory error: out of bounds pointer
+  at strcpy (harness.c:18)
+  ... symbolic write of 64 bytes into 32-byte buffer

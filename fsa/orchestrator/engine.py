@@ -33,6 +33,11 @@ class Stage(str, Enum):
     RANK = "RANK"
     VERIFY_TOP_K = "VERIFY_TOP_K"
     LOCAL_VALIDATION = "LOCAL_VALIDATION"
+    # External-analyzer track (all required=False -> degrades, never aborts).
+    EXTERNAL_ANALYSIS = "EXTERNAL_ANALYSIS"
+    FUSION = "FUSION"
+    SYMEX_PRUNE = "SYMEX_PRUNE"
+    CONSTRAINED_VALIDATION = "CONSTRAINED_VALIDATION"
     REPORT = "REPORT"
     DONE = "DONE"
     ABORTED = "ABORTED"
@@ -46,10 +51,14 @@ TRANSITIONS: dict[str, tuple[str, str | None]] = {
     Stage.SURFACE.value: (Stage.BINARY_TRIAGE.value, None),
     Stage.BINARY_TRIAGE.value: (Stage.DECOMPILE.value, None),
     Stage.DECOMPILE.value: (Stage.STATIC_ANALYSIS.value, Stage.STATIC_ANALYSIS.value),
-    Stage.STATIC_ANALYSIS.value: (Stage.RANK.value, None),
-    Stage.RANK.value: (Stage.VERIFY_TOP_K.value, None),
-    Stage.VERIFY_TOP_K.value: (Stage.REPORT.value, Stage.LOCAL_VALIDATION.value),
-    Stage.LOCAL_VALIDATION.value: (Stage.REPORT.value, Stage.REPORT.value),
+    Stage.STATIC_ANALYSIS.value: (Stage.EXTERNAL_ANALYSIS.value, None),
+    Stage.EXTERNAL_ANALYSIS.value: (Stage.FUSION.value, None),
+    Stage.FUSION.value: (Stage.RANK.value, None),
+    Stage.RANK.value: (Stage.SYMEX_PRUNE.value, None),
+    Stage.SYMEX_PRUNE.value: (Stage.VERIFY_TOP_K.value, None),
+    Stage.VERIFY_TOP_K.value: (Stage.LOCAL_VALIDATION.value, None),
+    Stage.LOCAL_VALIDATION.value: (Stage.CONSTRAINED_VALIDATION.value, Stage.CONSTRAINED_VALIDATION.value),
+    Stage.CONSTRAINED_VALIDATION.value: (Stage.REPORT.value, Stage.REPORT.value),
     Stage.REPORT.value: (Stage.DONE.value, None),
 }
 

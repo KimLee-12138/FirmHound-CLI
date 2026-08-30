@@ -1,0 +1,261 @@
+[
+  {
+    "cve_id": "CVE-2017-17215",
+    "device": "Huawei HG532e",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "Upgrade",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "soap_arg",
+      "name": "NewStatusURL"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "Upgrade",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://xz.aliyun.com/news/90989",
+      "https://xidp0.github.io/2025/07/12/CVE-2017-17215%20%E5%8D%8E%E4%B8%BAHG532%E8%B7%AF%E7%94%B1%E5%99%A8RCE%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0/"
+    ],
+    "binary_id": "bin-CVE-2017-17215",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2018-5767",
+    "device": "D-Link DIR-8xx",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "SetRouterSettings",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "soap_arg",
+      "name": "RemotePort"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "SetRouterSettings",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://blog.csdn.net/song_lee/article/details/113800058",
+      "https://xz.aliyun.com/news/19106"
+    ],
+    "binary_id": "bin-CVE-2018-5767",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2019-16920",
+    "device": "D-Link DIR-8xx",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "login_handler",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "http_param",
+      "name": "captcha"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "login_handler",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://www.iotsec-zone.com/article/355",
+      "https://www.freesion.com/article/5502634955/",
+      "https://blog.csdn.net/nullname0396/article/details/105679377"
+    ],
+    "binary_id": "bin-CVE-2019-16920",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2019-17621",
+    "device": "D-Link DIR-859",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "soap_main",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "soap_arg",
+      "name": "SOAPAction"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "soap_main",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://www.cnblogs.com/m00nflower/p/15933470.html",
+      "https://cn-sec.com/archives/1610453.html",
+      "https://nightrainy.github.io/2020/02/25/DIR-859-RCE%E5%88%86%E6%9E%90-CVE-2019%E2%80%9317621%E5%A4%8D%E7%8E%B0/"
+    ],
+    "binary_id": "bin-CVE-2019-17621",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2020-10987",
+    "device": "D-Link DIR-8xx",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "formReboot",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "http_param",
+      "name": "submit_url"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "formReboot",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://www.iotsec-zone.com/article/119",
+      "https://nosec.org/home/detail/4634.html",
+      "https://blog.csdn.net/song_lee/article/details/113800058"
+    ],
+    "binary_id": "bin-CVE-2020-10987",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2020-9373",
+    "device": "TP-Link Archer",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "xxx_handler",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "http_param",
+      "name": "ip"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "xxx_handler",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://cloud.tencent.com/developer/article/1599692",
+      "https://www.023niu.com/show-62-565-1.html"
+    ],
+    "binary_id": "bin-CVE-2020-9373",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2021-31802",
+    "device": "NETGEAR R7000",
+    "vuln_class": "overflow",
+    "entry": {
+      "function": "http_request_handler",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "header",
+      "name": "User-Agent"
+    },
+    "sink": {
+      "function": "strcpy",
+      "type": "memory_copy"
+    },
+    "call_chain": [
+      "http_request_handler",
+      "strcpy"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://www.anquanke.com/post/id/272402",
+      "https://github.com/flamelu/Vulnerability-1/blob/main/NETGEAR%20R7000%20%E7%BC%93%E5%86%B2%E5%8C%BA%E6%BA%A2%E5%87%BA%E6%BC%8F%E6%B4%9E%EF%BC%88CVE-2021-31802%EF%BC%89.md",
+      "https://cn-sec.com/archives/3872497.html"
+    ],
+    "binary_id": "bin-CVE-2021-31802",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2023-27021",
+    "device": "Tenda",
+    "vuln_class": "command_injection",
+    "entry": {
+      "function": "formSetOnlineDevName",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "http_param",
+      "name": "devicename"
+    },
+    "sink": {
+      "function": "system",
+      "type": "command_execution"
+    },
+    "call_chain": [
+      "formSetOnlineDevName",
+      "system"
+    ],
+    "verdict": "ACCEPT",
+    "references": [
+      "https://yhuanhuan01.github.io/2024/05/10/CVE-2023-27021/",
+      "https://xz.aliyun.com/news/12949",
+      "https://avd.aliyun.com/detail?id=AVD-2023-27021"
+    ],
+    "binary_id": "bin-CVE-2023-27021",
+    "presumed": true
+  },
+  {
+    "cve_id": "CVE-2023-32154",
+    "device": "MikroTik RouterOS",
+    "vuln_class": "other",
+    "entry": {
+      "function": "ipv6_neighbor_discovery",
+      "addr": "0x00405000"
+    },
+    "source": {
+      "type": "socket_buf",
+      "name": "nd_packet"
+    },
+    "sink": {
+      "function": "memcpy",
+      "type": "memory_copy"
+    },
+    "call_chain": [
+      "ipv6_neighbor_discovery",
+      "memcpy"
+    ],
+    "verdict": "NEED_DYNAMIC",
+    "references": [
+      "https://wood1314.github.io/year/08/29/clv60a9oi0000ap3fw38uc2mg/",
+      "https://devco.re/blog/2024/05/24/pwn2own-toronto-2022-a-9-year-old-bug-in-mikrotik-routeros-en/",
+      "https://research.qianxin.com/archives/1985",
+      "https://www.zerodayinitiative.com/advisories/ZDI-23-710/"
+    ],
+    "binary_id": "bin-CVE-2023-32154",
+    "presumed": true
+  }
+]

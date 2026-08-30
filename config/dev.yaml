@@ -20,3 +20,72 @@ logging:
   level: INFO
   format: jsonl
   destination: ./runs/logs
+
+# --------------------------------------------------------------------------- #
+# External analyzers (SaTC / FirmRec / KLEE / BOND)
+#
+# Every tool is DISABLED by default. The orchestrator discovers them through
+# tools/registry/external.yaml, but only runs one when its `enabled` is true.
+# The whole `external` block is also gated by the top-level `enabled` flag, so
+# setting it to false turns off the entire external track regardless of per-tool
+# flags. This is the F7 degradation safety net: with everything off, the pipeline
+# behaves exactly as it did before external integration.
+# --------------------------------------------------------------------------- #
+external:
+  enabled: false
+  workdir: ./tmp/external          # must stay inside ./tmp (safety whitelist)
+  timeout_s: 3600                  # per-invocation hard timeout for one analyzer
+
+  satc:
+    enabled: false
+    image: smile0304/satc          # docker image; pulled on first enabled run
+    taint_check: true             # angr taint engine (much slower when on)
+    scripts:                       # Ghidra scripts to run, in order
+      - ref2sink_cmdi
+      - ref2sink_bof
+      - ref2share
+    enable_share2sink: true        # cross-process (nvram/env) taint; needs ref2share out
+    max_bins: 3                    # Top-N border binaries; -l N when none given
+    memory: 16g                    # Ghidra headroom; lower if host RAM is tight
+
+  firmrec:
+    enabled: false
+    # Recurring-vulnerability detection. Requires a known-vuln signature DB and
+    # is isolated so it never participates in a blind benchmark run.
+    image: xylearn/firmrec-base   # docker image; pulled on first enabled run
+    signature_db: ./benchmarks/CVEs
+    vuln_info_source: our         # our | official (our = 9-CVE knowledge base)
+    mode: signature_only           # blind runs are forbidden
+    sanitize_poc: true             # hard gate: poc must pass sanitizer before persist
+    timeout_s: 7200                # pipeline + PostgreSQL warm-up cap
+
+  klee:
+    enabled: false
+    # Symbolic execution. Needs LLVM bitcode (wllvm) or a lifted binary harness.
+    harness: auto                  # auto | source | binary
+    max_time_s: 14400              # 4h cap per harness (S3 binary-lift hard stop)
+    backend: auto                  # auto | wsl | local | docker (KLEE runs via LLVM bitcode)
+    solver: z3                     # KLEE solver backend (z3 recommended; stp also supported)
+    image: kleever/klee:llvm-16    # docker image (LLVM 16 + Z3 + KLEE 3.2) when backend=docker
+    llvm: "16"                     # LLVM toolchain version expected by the backend
+    max_forks: 64                  # path-explosion guard (--max-forks)
+    max_depth: 200                 # path-explosion guard (--max-depth)
+    search: dfs                    # KLEE search strategy
+
+  bond:
+    enabled: false
+    # Constraint-directed fuzzing (mini-BOND). PoC outputs are sanitized before persistence.
+    target: emulation              # HARD enforce: only "emulation" is allowed; real devices are refused
+    target_ip: ""                  # MUST be a private RFC1918 address when emulation is live (safety gate)
+    authorized: false              # operator authorization -> must be true to fuzz
+    local_lab: false               # lab context flag
+    baseline_ready: false          # clean-baseline snapshot flag (for crash diffing)
+    simulate: true                 # when true, no real fuzz traffic (CI/host); stays honest
+    emulator: qemu_user            # FirmAE/QEMU emulation backend (emulation only)
+    sanitize_poc: true             # hard gate: poc_sanitized must be true or the finding is dropped
+    max_time_s: 7200               # per-harness fuzz budget
+    max_seeds: 12                  # scheduler seed budget (priority-aware)
+    backend: auto                  # auto | wsl | local | docker
+    image: bond/mini:latest        # mini-BOND docker image (boofuzz + ghidra-headless) when backend=docker
+    use_ghidra: false              # when true, prefer Ghidra headless CFG/CG export over synthetic CFG
+    llm_template: false            # when true, use LLM runtime for fuzz-template generation (else rule fallback)

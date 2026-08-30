@@ -1,0 +1,111 @@
+# External analyzer registry.
+#
+# Every external tool (SaTC / FirmRec / KLEE / BOND) is declared here so the
+# orchestrator can discover and invoke it through ToolRegistry. Each adapter
+# function lives in tools/external/adapter.py (or tools/external/run_all.py) and
+# returns a plain dict; ToolRegistry wraps it into a successful ToolResult so a
+# skipped/unavailable analyzer degrades the stage instead of aborting the run.
+#
+# The actual enable/disable switch is in config/dev.yaml `external:` (all off by
+# default). These declarations are always present; they just no-op when disabled.
+
+tools:
+  # --- SaTC: shared-keyword aware taint checker (fully implemented) ----------
+  - name: tools.external.satc
+    module_path: tools.external.adapter
+    function_name: run_satc
+    description: >
+      Run SaTC (USENIX Sec'21) shared-keyword taint checker over the extracted
+      firmware rootfs. Produces normalized external_finding documents covering
+      command-injection, buffer-overflow, and cross-process (nvram/env) sinks.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+          description: Pipeline run directory; findings are written to its artifacts.
+        config_path:
+          type: string
+          description: Optional path to a YAML config overriding config/dev.yaml.
+      required: [run_dir]
+
+  # --- FirmRec: recurring-vulnerability detector (owned by student F) --------
+  - name: tools.external.firmrec
+    module_path: tools.external.adapter
+    function_name: run_firmrec
+    description: >
+      Run FirmRec (CCS'24) recurring-vulnerability detector. Requires known-vuln
+      signatures; isolated so it never participates in a blind benchmark run.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]
+
+  # --- KLEE: symbolic execution path feasibility (owned by student G) --------
+  - name: tools.external.klee
+    module_path: tools.external.adapter
+    function_name: run_klee
+    description: >
+      Run KLEE symbolic execution to prune infeasible external candidates and emit
+      witness inputs / path constraints consumed by directed fuzzing.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]
+
+  # --- BOND: constraint-directed fuzzing validation (owned by student H) -----
+  - name: tools.external.bond
+    module_path: tools.external.adapter
+    function_name: run_bond
+    description: >
+      Run BOND constraint-directed fuzzing to validate external candidates. PoC
+      outputs are sanitized before any finding may be persisted.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]
+
+  # --- EXTERNAL_ANALYSIS stage fan-out ---------------------------------------
+  - name: tools.external.run_all
+    module_path: tools.external.run_all
+    function_name: run_all
+    description: >
+      EXTERNAL_ANALYSIS stage entry point. Runs every enabled external analyzer in
+      parallel and merges their normalized findings.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]
+
+  # --- FUSION stage ---------------------------------------------------------
+  - name: tools.analysis.finding_fusion
+    module_path: tools.analysis.finding_fusion
+    function_name: fuse
+    description: >
+      FUSION stage entry point. Deduplicates external findings across tools,
+      cross-validates them against main-track candidates, flags external_only
+      hits, and enforces FirmRec blind-run isolation.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]

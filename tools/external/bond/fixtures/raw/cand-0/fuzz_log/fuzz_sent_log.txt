@@ -1,0 +1,4 @@
+VERSION: BOND mini mini-0.1
+SENT: GET /goform/SetWan?Save=1&Mode=General&MTU=1500
+TRIGGERED:marker
+PoC: touch /tmp/lab_marker

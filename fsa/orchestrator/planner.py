@@ -41,6 +41,28 @@ class Planner:
         "DONE",
     ]
 
+    # Full depth: main track + the full external-analyzer track. Every external
+    # stage is required=False, so a disabled/missing analyzer degrades to a no-op
+    # and the run still reaches DONE. This is the F7 degradation safety net.
+    FULL_STAGES = [
+        "INIT",
+        "BASELINE",
+        "UNPACK",
+        "SURFACE",
+        "BINARY_TRIAGE",
+        "DECOMPILE",
+        "STATIC_ANALYSIS",
+        "EXTERNAL_ANALYSIS",
+        "FUSION",
+        "RANK",
+        "SYMEX_PRUNE",
+        "VERIFY_TOP_K",
+        "LOCAL_VALIDATION",
+        "CONSTRAINED_VALIDATION",
+        "REPORT",
+        "DONE",
+    ]
+
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config = config or {}
 
@@ -194,11 +216,12 @@ class Planner:
     def build_plan(self, task_card: dict[str, Any]) -> dict[str, Any]:
         """Generate a stage plan from a task_card."""
         depth = task_card.get("depth", "standard")
-        stages = self.QUICK_STAGES if depth == "quick" else self.DEFAULT_STAGES
-        if depth == "full" and "LOCAL_VALIDATION" not in stages:
-            stages = list(stages)
-            idx = stages.index("VERIFY_TOP_K") + 1
-            stages.insert(idx, "LOCAL_VALIDATION")
+        if depth == "quick":
+            stages = list(self.QUICK_STAGES)
+        elif depth == "full":
+            stages = list(self.FULL_STAGES)
+        else:  # "standard" and anything else -> main track only, no external stages
+            stages = list(self.DEFAULT_STAGES)
 
         plan: dict[str, Any] = {
             "stages": stages,
@@ -208,6 +231,20 @@ class Planner:
                 "BINARY_TRIAGE": {"tool": "tools.binary.triage", "required": True},
                 "DECOMPILE": {"tool": "tools.binary.decompile", "required": False},
                 "STATIC_ANALYSIS": {"tool": "tools.audit.static", "required": True},
+                # External track (all required=False).
+                "EXTERNAL_ANALYSIS": {
+                    "tool": "tools.external.run_all",
+                    "required": False,
+                },
+                "FUSION": {
+                    "tool": "tools.analysis.finding_fusion",
+                    "required": False,
+                },
+                "SYMEX_PRUNE": {"tool": "tools.external.klee", "required": False},
+                "CONSTRAINED_VALIDATION": {
+                    "tool": "tools.external.bond",
+                    "required": False,
+                },
                 "RANK": {"tool": "tools.audit.rank", "required": True},
                 "VERIFY_TOP_K": {"tool": "tools.audit.verify", "required": True},
                 "LOCAL_VALIDATION": {"tool": "tools.emu.validate", "required": False},
