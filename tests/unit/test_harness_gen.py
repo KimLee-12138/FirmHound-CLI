@@ -24,7 +24,9 @@ from tools.external.klee.harness_gen import (
 
 
 def test_cmdi_harness_contains_markers():
-    spec = HarnessSpec(func_name="formexeCommand", sink_func="system", vuln_class="command_injection")
+    spec = HarnessSpec(
+        func_name="formexeCommand", sink_func="system", vuln_class="command_injection"
+    )
     src = render_harness(spec)
     assert "klee_make_symbolic" in src
     assert "klee_assume" in src
@@ -36,7 +38,9 @@ def test_cmdi_harness_contains_markers():
 
 
 def test_overflow_harness_uses_buf_size_and_stub():
-    spec = HarnessSpec(func_name="dangerous_func", sink_func="strcpy", vuln_class="overflow", buf_size=32)
+    spec = HarnessSpec(
+        func_name="dangerous_func", sink_func="strcpy", vuln_class="overflow", buf_size=32
+    )
     src = render_harness(spec)
     assert "char buf[32]" in src
     assert "__fsa_strcpy" in src
@@ -70,7 +74,9 @@ def test_spec_from_candidate_recovers_sink():
 
 
 def test_generate_harness_writes_c(tmp_path):
-    spec = HarnessSpec(func_name="formexeCommand", sink_func="system", vuln_class="command_injection")
+    spec = HarnessSpec(
+        func_name="formexeCommand", sink_func="system", vuln_class="command_injection"
+    )
     res = generate_harness(spec, tmp_path)
     assert res.c_path is not None and res.c_path.exists()
     text = res.c_path.read_text(encoding="utf-8")
@@ -84,7 +90,9 @@ def test_compile_to_bc_with_real_clang(tmp_path):
     clang = shutil.which("clang-16") or shutil.which("clang")
     if clang is None:
         pytest.skip("clang not installed; KLEE bitcode compile requires LLVM")
-    spec = HarnessSpec(func_name="formexeCommand", sink_func="system", vuln_class="command_injection")
+    spec = HarnessSpec(
+        func_name="formexeCommand", sink_func="system", vuln_class="command_injection"
+    )
     res = generate_harness(spec, tmp_path)
     assert res.c_path is not None
     bc = tmp_path / "out.bc"

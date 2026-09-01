@@ -23,7 +23,14 @@ import pytest
 
 from tools.external.klee.parser import parse_klee_output
 
-FIXTURE_DIR = Path(__file__).resolve().parent.parent.parent / "tools" / "external" / "klee" / "fixtures" / "raw"
+FIXTURE_DIR = (
+    Path(__file__).resolve().parent.parent.parent
+    / "tools"
+    / "external"
+    / "klee"
+    / "fixtures"
+    / "raw"
+)
 
 
 def _harness_map() -> dict[str, dict]:

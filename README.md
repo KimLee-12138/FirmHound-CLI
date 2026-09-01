@@ -397,9 +397,12 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | 命令 | 用途 | 产物 |
 |---|---|---|
 | `python scripts/dev.py test` | 跑全部单元测试 | — |
+| `python scripts/dev.py test-all` | 单元测试 + 主机相关集成测试 | — |
+| `python scripts/dev.py ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
 | `python scripts/dev.py lint` | ruff 代码检查 | — |
 | `python scripts/dev.py format` | 自动格式化 | — |
 | `python scripts/run_pipeline.py --out-dir runs/pipeline --top-k 5` | 金标准回归（9 个 CVE） | `ranking.json` / `verdicts.json` / `report.md` |
+| `python scripts/run_pipeline.py --depth full --out-dir runs/ext_full` | 双轨完整链；默认 Blind Run 且四器全关 | 外部 findings / unified candidates / 报告第 21 节 |
 | `python scripts/run_e2e.py --rootfs <rootfs> --out-dir runs/xxx` | **真实固件分析（核心）** | `analysis.json` / `report.md` |
 | `python scripts/demo_rank.py --out-dir runs/demo` | 评分排序演示 | `ranking.json` / `ranking.md` |
 | `bash scripts/setup_wsl.sh`（WSL 内） | 一键装 Linux 工具链 | — |
@@ -435,15 +438,15 @@ export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xx
 .
 ├── fsa/                    # 核心包：orchestrator / runtime / safety / schemas / reporting / prompts / utils
 ├── tools/                  # 确定性工具：firmware(解包) / filesystem / web(攻击面) / binary / analysis / emulation
-├── skills/                 # Skill 知识库（9 个 SKILL.md 包，00-07）
-├── schemas/                # 9 个 JSON Schema + examples
+├── skills/                 # Skill 知识库（00-08，含四个外部分析器子 Skill）
+├── schemas/                # JSON Schema + examples（含 external_finding）
 ├── config/                 # dev.yaml / models.yaml / safety.yaml
 ├── benchmarks/CVEs/        # 9 个历史 CVE 金标准 fixture
 ├── scripts/                # CLI 入口（dev / run_pipeline / run_e2e / demo_rank / setup_wsl）
 ├── firmware_samples/       # ← 固件放置目录
 ├── tmp/                    # 解包产物
 ├── runs/                   # 分析报告与 JSON 产物
-├── tests/                  # 单元 / 集成测试（189 passed）
+├── tests/                  # 单元 / 集成测试（CI 不依赖外部重型工具）
 └── docs/                   # 设计文档、WSL 指南、挖洞教程
 ```
 
@@ -459,7 +462,18 @@ export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xx
 | 04-audit | 专项审计 | command-injection / buffer-overflow 复现经验 |
 | 05-candidate-verifier | 反证审查 | 10 问清单、12 条硬判定 |
 | 06-dynamic-validation | 动态验证 | L0–L3 分层、qemu-user 三大坑、安全门 |
-| 07-report | 报告生成 | 20 节骨架、7 项合规扫描、脱敏 |
+| 07-report | 报告生成 | 21 节骨架、8 项合规扫描、脱敏 |
+| 08-external-analyzers | 双轨外部分析 | SaTC/FirmRec/KLEE/BOND、汇聚、降级与先验隔离 |
+
+## 外部分析器双轨链
+
+`--depth full` 使用固定顺序：SaTC/FirmRec 上游分析 → FUSION → KLEE 保守剪枝 →
+RANK/Verifier → mini-BOND 约束验证。FirmRec 是已知漏洞复发扫描旁路，Blind Run
+会被代码强制关闭，结果独立保存且不计入零先验指标。
+
+四器全部是可选增强：总开关和单工具开关默认关闭；缺镜像、缺 KLEE、超时或解析失败
+都必须返回结构化 `status + limitation`，不能阻断主报告。安装、能力边界和复现状态见
+`docs/external_analyzers.md`。
 
 ## 评分与结论模型
 
@@ -478,12 +492,13 @@ export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xx
 3. **网络隔离**：仅私有网段与 `127.0.0.1`；动态验证目标非私有 → `ABORT_DYNAMIC_VALIDATION`
 4. **动态验证四门**：`AUTHORIZED && LOCAL_LAB && PRIVATE_NETWORK && BASELINE_READY`
 5. **非武器化探针**：只允许 `touch/echo/id/uname`；反弹 shell / 持久化 / 下载执行一律拒绝
-6. **报告合规 7 项**：无真实 IP / 无反弹 Shell / 无持久化 / 无下载执行 / 无破坏性命令 / 含安全声明 / 仅标记验证
+6. **报告合规 8 项**：原 7 项 + 外部 PoC 必须 `poc_sanitized=true`
 
 ## 测试
 
 ```bash
-python scripts/dev.py test    # 189 passed
+python scripts/dev.py test    # 确定性单元测试（CI 主门）
+python scripts/dev.py test-all # 含可选 WSL/Linux 工具集成测试
 python scripts/dev.py lint    # ruff 全绿
 ```
 
@@ -506,7 +521,7 @@ python scripts/dev.py lint    # ruff 全绿
 能。系统不依赖 CVE 特征硬编码：`run_e2e.py` 演练证明零 CVE 先验可检出植入命令注入。现场流程 = 放置固件 → 解包 → 分析 → 人工审计 → 报告。
 
 **Q5：报告里会不会出现可武器化内容？**
-不会。Skill 07 强制 7 项合规扫描 + 脱敏渲染，真实 IP / 反弹 shell 等以占位符替代。
+不会。Skill 07 强制 8 项合规扫描 + 脱敏渲染，真实 IP / 反弹 shell 等以占位符替代；未标记 `poc_sanitized=true` 的外部验证证据会被拒绝。
 
 **Q6：WSL 服务不稳定（0x8007274c）？**
 `wsl --shutdown` 后重试；或直接改用纯 Linux 路线（路线 B）。

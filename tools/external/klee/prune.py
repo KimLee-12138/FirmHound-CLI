@@ -18,7 +18,12 @@ Timeouts / path explosions are NOT prunes: they are appended to
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
+
+from fsa.utils.jsonio import save_json
+from tools.external.base import normalize_addr
 
 # Single source of truth for the audit threshold (G-KLEE.md §8.2).
 AUDIT_PRUNE_RATE_THRESHOLD = 0.70
@@ -50,9 +55,7 @@ def prune_candidate(
 
     if reachable is False and reason == "infeasible":
         # Counterevidence ONLY. Do not touch conclusion_category.
-        candidate["counterevidence"].append(
-            f"klee:infeasible:{harness_version}:{finding_id}"
-        )
+        candidate["counterevidence"].append(f"klee:infeasible:{harness_version}:{finding_id}")
     elif reason in ("timeout", "path_explosion"):
         # Feasibility undetermined -> record as a limitation, do not change score.
         candidate["limitations"].append(f"klee:{reason}")
@@ -74,8 +77,7 @@ def prune_rate(symex_results: list[dict[str, Any]]) -> float:
     if not symex_results:
         return 0.0
     infeasible = sum(
-        1 for r in symex_results
-        if r.get("reachable") is False and r.get("reason") == "infeasible"
+        1 for r in symex_results if r.get("reachable") is False and r.get("reason") == "infeasible"
     )
     return round(infeasible / len(symex_results), 3)
 
@@ -108,6 +110,108 @@ def sample_for_audit(
     return infeasible_ids[:size]
 
 
+def _matches(candidate: dict[str, Any], finding: dict[str, Any]) -> bool:
+    """Return whether a KLEE finding belongs to a unified candidate."""
+    if candidate.get("binary_id") != finding.get("binary_id"):
+        return False
+    candidate_sink = candidate.get("sink") or {}
+    finding_sink = finding.get("sink") or {}
+    candidate_addr = normalize_addr(candidate_sink.get("addr"))
+    finding_addr = normalize_addr(finding_sink.get("addr"))
+    if candidate_addr and finding_addr:
+        return candidate_addr == finding_addr
+    return candidate_sink.get("function") == finding_sink.get("function")
+
+
+def apply_findings(
+    candidates: list[dict[str, Any]], findings: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Apply KLEE evidence without deleting or directly rejecting candidates."""
+    applied = 0
+    reachable = 0
+    infeasible = 0
+    for finding in findings:
+        symex = finding.get("symex") or {}
+        for candidate in candidates:
+            if not _matches(candidate, finding):
+                continue
+            prune_candidate(
+                candidate,
+                symex,
+                finding_id=str(finding.get("finding_id", "")),
+                harness_version=str(symex.get("harness_version", "v1")),
+            )
+            candidate["symex"] = symex
+            if symex.get("reachable") is True:
+                reachable += 1
+                witness = symex.get("witness_input")
+                if witness is not None:
+                    candidate["poc_candidate"] = witness
+                evidence = candidate.setdefault("evidence", [])
+                marker = f"klee:reachable:{finding.get('finding_id', '')}"
+                if marker not in evidence:
+                    evidence.append(marker)
+            elif symex.get("reachable") is False and symex.get("reason") == "infeasible":
+                infeasible += 1
+            applied += 1
+            break
+    symex_results = [f.get("symex") or {} for f in findings]
+    return {
+        "applied": applied,
+        "reachable": reachable,
+        "infeasible": infeasible,
+        "prune_rate": prune_rate(symex_results),
+        "needs_manual_audit": needs_manual_audit(symex_results),
+        "audit_sample": sample_for_audit(findings),
+    }
+
+
+def execute_prune(run_dir: str | Path, config_path: str | None = None) -> dict[str, Any]:
+    """Registry entry for SYMEX_PRUNE: run KLEE and persist conservative updates."""
+    from tools.external.adapter import run_klee
+
+    run_dir = Path(run_dir)
+    result = run_klee(run_dir, config_path)
+    if result.get("status") != "ok":
+        return {
+            "status": result.get("status", "failed"),
+            "tool": "klee",
+            "metrics": {"applied": 0, "prune_rate": 0.0},
+            "limitation": result.get("limitation", "KLEE did not produce findings"),
+        }
+
+    unified_path = run_dir / "artifacts" / "unified_candidates.json"
+    if not unified_path.exists():
+        return {
+            "status": "failed",
+            "tool": "klee",
+            "metrics": {"applied": 0, "prune_rate": 0.0},
+            "limitation": "unified_candidates.json missing; FUSION must run before SYMEX_PRUNE",
+        }
+    try:
+        document = json.loads(unified_path.read_text(encoding="utf-8"))
+        candidates = document.get("candidates", [])
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "status": "failed",
+            "tool": "klee",
+            "metrics": {"applied": 0, "prune_rate": 0.0},
+            "limitation": f"could not load unified candidates: {exc}",
+        }
+
+    metrics = apply_findings(candidates, result.get("findings", []))
+    document["candidates"] = candidates
+    document["symex"] = metrics
+    save_json(unified_path, document)
+    return {
+        "status": "ok",
+        "tool": "klee",
+        "metrics": metrics,
+        "artifact": str(unified_path),
+        "limitation": "",
+    }
+
+
 __all__ = [
     "AUDIT_PRUNE_RATE_THRESHOLD",
     "AUDIT_SAMPLE_SIZE",
@@ -115,4 +219,6 @@ __all__ = [
     "prune_rate",
     "needs_manual_audit",
     "sample_for_audit",
+    "apply_findings",
+    "execute_prune",
 ]

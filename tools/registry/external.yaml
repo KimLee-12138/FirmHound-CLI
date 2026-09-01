@@ -91,6 +91,9 @@ tools:
           type: string
         config_path:
           type: string
+        phase:
+          type: string
+          enum: [all, upstream]
       required: [run_dir]
 
   # --- FUSION stage ---------------------------------------------------------
@@ -101,6 +104,37 @@ tools:
       FUSION stage entry point. Deduplicates external findings across tools,
       cross-validates them against main-track candidates, flags external_only
       hits, and enforces FirmRec blind-run isolation.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]
+
+  - name: tools.external.klee.prune
+    module_path: tools.external.klee.prune
+    function_name: execute_prune
+    description: >
+      Run KLEE and conservatively attach feasibility evidence to unified
+      candidates. Infeasible paths are counterevidence only; candidates are
+      never deleted automatically.
+    args_schema:
+      type: object
+      properties:
+        run_dir:
+          type: string
+        config_path:
+          type: string
+      required: [run_dir]
+
+  - name: tools.external.bond.validate
+    module_path: tools.external.bond.validate
+    function_name: execute_validation
+    description: >
+      Run mini-BOND after verification and apply only sanitized trigger evidence
+      to unified candidates. Non-triggering fuzz runs never reject a candidate.
     args_schema:
       type: object
       properties:

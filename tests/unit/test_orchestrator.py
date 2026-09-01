@@ -64,6 +64,14 @@ def test_build_plan_depths(planner: Planner) -> None:
 
     deep_plan = planner.build_plan({"depth": "full"})
     assert "LOCAL_VALIDATION" in deep_plan["stages"]
+    assert deep_plan["stages"].index("SYMEX_PRUNE") < deep_plan["stages"].index("RANK")
+    assert deep_plan["stage_configs"]["EXTERNAL_ANALYSIS"]["args"] == {
+        "phase": "upstream"
+    }
+    assert deep_plan["stage_configs"]["SYMEX_PRUNE"]["tool"].endswith(".prune")
+    assert deep_plan["stage_configs"]["CONSTRAINED_VALIDATION"]["tool"].endswith(
+        ".validate"
+    )
 
 
 def test_state_manager_lifecycle(tmp_path: Path) -> None:

@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from fsa.runtime.tool_registry import ToolRegistry
-from tools.external.adapter import run_satc
+from tools.external.adapter import _tool_cfg
 from tools.external.run_all import run_all
 
 _EXPECTED_REGISTRY = [
@@ -31,6 +31,17 @@ def test_registry_resolves_all_external_tools():
     reg = ToolRegistry()
     for name in _EXPECTED_REGISTRY:
         assert name in reg.list_tools(), f"{name} missing from registry"
+
+
+def test_global_switch_cannot_be_bypassed_by_tool_switch():
+    cfg = _tool_cfg({"enabled": False, "satc": {"enabled": True}}, "satc")
+    assert cfg["enabled"] is False
+
+
+def test_registry_resolves_convergence_tools():
+    reg = ToolRegistry()
+    assert "tools.external.klee.prune" in reg.list_tools()
+    assert "tools.external.bond.validate" in reg.list_tools()
 
 
 def _write_config(enabled_tools: set[str], *, external_enabled: bool = True, **satc_opts) -> str:
@@ -68,7 +79,10 @@ COMBOS = [
 
 @pytest.mark.parametrize("combo", COMBOS, ids=[c["name"] for c in COMBOS])
 def test_eight_switch_combos_degrade_without_abort(combo):
-    cfg_path = _write_config(combo["tools"], **{k: v for k, v in combo.items() if k in ("taint_check", "enable_share2sink")})
+    cfg_path = _write_config(
+        combo["tools"],
+        **{k: v for k, v in combo.items() if k in ("taint_check", "enable_share2sink")},
+    )
     run_dir = Path(tempfile.mkdtemp())
     # Must not raise, and must return a benign status dict.
     result = run_all(run_dir, config_path=cfg_path)
@@ -86,3 +100,10 @@ def test_run_external_via_registry_does_not_abort():
     res = reg.call("tools.external.satc", {"run_dir": tempfile.mkdtemp()})
     assert res.status == "success"
     assert res.output["status"] == "skipped"  # disabled by default
+
+
+def test_upstream_phase_excludes_downstream_tools(tmp_path):
+    cfg_path = _write_config({"klee", "bond"})
+    result = run_all(tmp_path, config_path=cfg_path, phase="upstream")
+    assert result["status"] == "skipped"
+    assert result["tools"] == []

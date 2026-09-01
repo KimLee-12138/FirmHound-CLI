@@ -22,13 +22,15 @@ tags: [report, verdict, compliance, m10, redaction]
 - `evidence` 索引（M9 证据链）
 - `decision.json` 条目（决策记录）
 - `dynamic_validation.json`（M8，可选）
+- `artifacts/external_findings/fused.json`、`recurrence_findings.json`、
+  `unified_candidates.json`（外部轨，可选）
 
 ## 输出
 
-- `report.md`：固定 20 节章节
+- `report.md`：固定 21 节章节
 - `final_verdict.json`：`{run_id, firmware_sha256, findings:[...], stats:{...}}`
 
-## 报告 20 节固定骨架
+## 报告 21 节固定骨架
 
 1. 任务范围与授权边界
 2. 固件信息与哈希
@@ -50,6 +52,7 @@ tags: [report, verdict, compliance, m10, redaction]
 18. 人工介入点
 19. 决策摘要
 20. 完整证据索引
+21. 外部工具交叉验证（SaTC/KLEE/BOND 主链；FirmRec 复发扫描独立标注）
 
 ## 执行流程
 
@@ -66,8 +69,9 @@ tags: [report, verdict, compliance, m10, redaction]
    - 报告中展示的是**可审计决策摘要**（options / selected / reason / confidence / actor）。
    - **绝不输出模型隐式思维链原文**；模型 reasoning 只提炼为一句 `reason`（≤200 字）。
 
-4. **合规扫描 7 项（全过才生成报告）**
+4. **合规扫描 8 项（全过才生成报告）**
    - 无真实 IP；无反弹 Shell 特征；无持久化；无下载执行；无破坏性命令；含安全声明；仅标记验证（`touch`/`echo`/`id`）。
+   - 外部 PoC 必须 `poc_sanitized == true`；不满足时整条证据拒绝落盘和渲染。
    - 复用 `tools/emulation/probes.detect_dangerous_payload` + `utils/netcheck.is_private_ip`。
 
 5. **如实报告**
@@ -82,12 +86,14 @@ tags: [report, verdict, compliance, m10, redaction]
 | 场景 | 行为 |
 |---|---|
 | 合规扫描不过 | 报告生成失败，输出违规项清单 |
-| 无 candidate | 报告如实写「未发现候选」，20 节骨架仍齐全 |
+| 无 candidate | 报告如实写「未发现候选」，21 节骨架仍齐全 |
 | M8 未运行 | 第 13 节标 `dynamic_skipped` + 原因 |
 | 证据索引缺失 | 第 20 节标「证据索引不完整」，不阻断报告 |
+| 外部工具缺失/超时 | 第 21 节写 `degraded` 与 limitation；主报告继续生成 |
+| FirmRec 在 Blind Run 被请求 | 强制 `skipped/FORCED_DISABLE`，只报告隔离事实，不渲染已知 CVE 结果 |
 
 ## 验收标准
 
-- 对任一 run 生成报告：20 节齐全、合规扫描通过、`final_verdict.json` 通过 Schema 校验。
+- 对任一 run 生成报告：21 节齐全、8 项合规扫描通过、`final_verdict.json` 通过 Schema 校验。
 - 报告中不出现任何可复现攻击参数（脱敏后）。
 - 全部 REJECT 场景如实输出「未发现强证据」。

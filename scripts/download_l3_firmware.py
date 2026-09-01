@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """下载 + 解包 + 回填 L3 基准固件（Tenda AC15 / Netgear R7000）。
 
 项目约定（见 docs/external/dataset.md）：原始固件统一落到 `firmware_samples/`，
@@ -25,13 +24,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import re
 import subprocess
 import urllib.request
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]          # 项目根目录（不写死中文路径）
+ROOT = Path(__file__).resolve().parents[1]  # 项目根目录（不写死中文路径）
 DEST = ROOT / "firmware_samples"
 MANIFEST = DEST / "L3_manifest.json"
 DATASET = ROOT / "docs" / "external" / "dataset.md"
@@ -134,9 +132,7 @@ def extract(zip_path: Path, ext: str) -> Path | None:
 
 def check_connectivity(fw: dict) -> None:
     try:
-        req = urllib.request.Request(
-            fw["url"], headers={**UA, "Range": "bytes=0-1023"}
-        )
+        req = urllib.request.Request(fw["url"], headers={**UA, "Range": "bytes=0-1023"})
         with urllib.request.urlopen(req, timeout=10) as r:
             r.read(1)
         print("  连通性: OK")
@@ -168,16 +164,16 @@ def binwalk_unpack(image: Path) -> Path | None:
     # 1) WSL Ubuntu-22.04（本机 binwalk/sasquatch 所在）
     proj_wsl = to_wsl(ROOT)
     img_wsl = to_wsl(image)
-    wsl_cmd = (
-        f"cd '{proj_wsl}' && python3 -m binwalk -e -C tmp/unpacked '{img_wsl}'"
-    )
+    wsl_cmd = f"cd '{proj_wsl}' && python3 -m binwalk -e -C tmp/unpacked '{img_wsl}'"
     if run(["wsl", "-d", "Ubuntu-22.04", "-e", "bash", "-c", wsl_cmd]) == 0:
         rf = find_rootfs(image)
         if rf:
             return rf
     # 2) 原生 binwalk 降级
-    for native in (["binwalk", "-e", "-C", str(UNPACK_DIR), str(image)],
-                   ["python3", "-m", "binwalk", "-e", "-C", str(UNPACK_DIR), str(image)]):
+    for native in (
+        ["binwalk", "-e", "-C", str(UNPACK_DIR), str(image)],
+        ["python3", "-m", "binwalk", "-e", "-C", str(UNPACK_DIR), str(image)],
+    ):
         if run(native) == 0:
             rf = find_rootfs(image)
             if rf:
@@ -197,16 +193,21 @@ def _elf_arch(path: Path) -> dict | None:
     ei_class = {1: "32-bit", 2: "64-bit"}.get(b[4], "?")
     endian = {1: "little-endian", 2: "big-endian"}.get(b[5], "?")
     machine = int.from_bytes(b[18:20], "little")
-    mmap = {40: "ARM", 183: "ARM64(aarch64)", 8: "MIPS", 3: "x86",
-            62: "x86-64", 21: "PowerPC", 94: "RISC-V"}
-    return {"class": ei_class, "endian": endian,
-            "machine": mmap.get(machine, f"#{machine}")}
+    mmap = {
+        40: "ARM",
+        183: "ARM64(aarch64)",
+        8: "MIPS",
+        3: "x86",
+        62: "x86-64",
+        21: "PowerPC",
+        94: "RISC-V",
+    }
+    return {"class": ei_class, "endian": endian, "machine": mmap.get(machine, f"#{machine}")}
 
 
 def detect_arch(rootfs: Path, fw: dict) -> str:
     """从解包后的 ELF 识别架构；对已知型号补 SoC 信息。"""
-    pref = [rootfs / "bin" / "busybox", rootfs / "bin" / "sh",
-            rootfs / "sbin" / "init"]
+    pref = [rootfs / "bin" / "busybox", rootfs / "bin" / "sh", rootfs / "sbin" / "init"]
     a = None
     for c in pref:
         if c.exists():
@@ -250,6 +251,7 @@ def cleanup_dup(rootfs: Path) -> None:
     if dup.exists():
         try:
             import shutil
+
             shutil.rmtree(dup)
             print("  + 已清理重复目录 squashfs-root-0")
         except Exception:
@@ -281,7 +283,7 @@ def backfill_dataset(manifest: dict) -> bool:
         for line in text.split("\n"):
             if line.startswith(f"| {label} |"):
                 cells = line.split("|")
-                # cells: ['', ' L3-x ', ' 型号/版本 ', ' url ', ' sha ', ' size ', ' arch ', ' status ', '']
+                # Table cells: row, model/version, URL, SHA, size, arch, status.
                 cells[4] = f" `{sha}` "
                 cells[5] = f" {size} "
                 cells[6] = f" {arch} "
@@ -337,7 +339,9 @@ def main() -> int:
                 img = extract(zip_path, fw["inner_ext"])
 
         if not img:
-            print(f"  ! {fw['id']} 未取到镜像（沙箱拦截 / 网络问题），本机跳过；8/31 真机可正常下载")
+            print(
+                f"  ! {fw['id']} 未取到镜像（沙箱拦截 / 网络问题），本机跳过；8/31 真机可正常下载"
+            )
             continue
 
         # 2) 解包 + 架构识别
@@ -376,9 +380,7 @@ def main() -> int:
         print(f"  size  : {img.stat().st_size:,} bytes")
 
     # 落盘 manifest
-    MANIFEST.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nManifest 已写入: {MANIFEST}")
 
     # 回填 dataset.md

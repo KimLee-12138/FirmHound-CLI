@@ -218,7 +218,9 @@ def parse_poc_info(poc_dir: Path, stats: ParseStats | None = None) -> list[dict[
         if not ok:
             if stats:
                 stats.dropped_unsafe += 1
-                stats.note(f"poc_info/{f.name}: unsafe payload rejected by sanitizer; finding dropped")
+                stats.note(
+                    f"poc_info/{f.name}: unsafe payload rejected by sanitizer; finding dropped"
+                )
             continue
         det = {
             "binary": str(meta.get("binary", "")).strip(),
@@ -260,7 +262,11 @@ def compute_confidence(similarity: str | float | None = None, *, has_entry: bool
             return round(min(max(s, 0.0), 1.0), 2)
         except (TypeError, ValueError):
             pass
-    base = 0.5 + 0.3 * (float(similarity) if similarity is not None else 0.0) + 0.2 * (1 if has_entry else 0)
+    base = (
+        0.5
+        + 0.3 * (float(similarity) if similarity is not None else 0.0)
+        + 0.2 * (1 if has_entry else 0)
+    )
     return round(min(base, 1.0), 2)
 
 
@@ -357,12 +363,12 @@ def parse_firmrec_output(
             sim_val = None
         has_entry = bool(det.get("source"))
         confidence = compute_confidence(sim_val, has_entry=has_entry)
-        formula_note = "" if sim_val is not None else " (confidence=0.5+0.3*sim+0.2*entry; sim not reported)"
+        formula_note = (
+            "" if sim_val is not None else " (confidence=0.5+0.3*sim+0.2*entry; sim not reported)"
+        )
 
         binary_id = (
-            normalize_binary_id(rootfs, rootfs / binary)
-            if (rootfs / binary).exists()
-            else binary
+            normalize_binary_id(rootfs, rootfs / binary) if (rootfs / binary).exists() else binary
         )
         slug = re.sub(r"[^A-Za-z0-9]+", "-", binary_id).strip("-") or "unknown"
         poc_sanitized = bool(det.get("poc_sanitized", False))
@@ -406,9 +412,7 @@ def parse_firmrec_output(
         findings.append(finding)
 
     if not findings:
-        stats.note(
-            "no recurring vulnerabilities parsed; check VULNS.md / pg_*.csv / poc_info"
-        )
+        stats.note("no recurring vulnerabilities parsed; check VULNS.md / pg_*.csv / poc_info")
     return findings, stats
 
 

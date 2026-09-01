@@ -11,18 +11,14 @@ benign ``skipped`` summary so the pipeline proceeds to the fusion stage.
 
 from __future__ import annotations
 
-import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 from fsa.utils.jsonio import save_json
+from tools.external.adapter import EXTERNAL_TOOLS, _load_global_external, _run_tool
 
-from tools.external.adapter import (
-    EXTERNAL_TOOLS,
-    _load_global_external,
-    _run_tool,
-)
+UPSTREAM_TOOLS = ("satc", "firmrec")
 
 
 def run_tool(tool: str, run_dir: str | Path, config_path: str | None = None) -> dict[str, Any]:
@@ -30,7 +26,11 @@ def run_tool(tool: str, run_dir: str | Path, config_path: str | None = None) -> 
     return _run_tool(tool, run_dir, config_path)
 
 
-def run_all(run_dir: str | Path, config_path: str | None = None) -> dict[str, Any]:
+def run_all(
+    run_dir: str | Path,
+    config_path: str | None = None,
+    phase: str = "all",
+) -> dict[str, Any]:
     """Run all *enabled* external analyzers and merge their outputs.
 
     Returns a dict with ``status`` (ok | skipped), ``per_tool`` results, and the
@@ -40,10 +40,19 @@ def run_all(run_dir: str | Path, config_path: str | None = None) -> dict[str, An
     """
     run_dir = Path(run_dir)
     global_ext = _load_global_external(config_path)
+    selected = UPSTREAM_TOOLS if phase == "upstream" else EXTERNAL_TOOLS
+    if phase not in {"all", "upstream"}:
+        return {
+            "status": "failed",
+            "tools": [],
+            "findings": 0,
+            "per_tool": {},
+            "limitation": f"unsupported external analyzer phase: {phase}",
+        }
     enabled = [
         t
-        for t in EXTERNAL_TOOLS
-        if (global_ext.get(t, {}) or {}).get("enabled", False)
+        for t in selected
+        if global_ext.get("enabled", False) and (global_ext.get(t, {}) or {}).get("enabled", False)
     ]
 
     if not enabled:
@@ -52,14 +61,13 @@ def run_all(run_dir: str | Path, config_path: str | None = None) -> dict[str, An
             "tools": [],
             "findings": 0,
             "per_tool": {},
-            "limitation": "all external analyzers disabled in config (external.enabled=false)",
+            "phase": phase,
+            "limitation": "all selected external analyzers disabled in config",
         }
 
     per_tool: dict[str, Any] = {}
     with ThreadPoolExecutor(max_workers=min(len(enabled), 4)) as pool:
-        futures = {
-            pool.submit(_run_tool, tool, run_dir, config_path): tool for tool in enabled
-        }
+        futures = {pool.submit(_run_tool, tool, run_dir, config_path): tool for tool in enabled}
         for future in futures:
             tool = futures[future]
             try:
@@ -78,6 +86,7 @@ def run_all(run_dir: str | Path, config_path: str | None = None) -> dict[str, An
         "tools": enabled,
         "findings": total_findings,
         "per_tool": per_tool,
+        "phase": phase,
     }
 
     out_dir = run_dir / "artifacts" / "external_findings"
@@ -87,4 +96,4 @@ def run_all(run_dir: str | Path, config_path: str | None = None) -> dict[str, An
     return combined
 
 
-__all__ = ["run_tool", "run_all"]
+__all__ = ["UPSTREAM_TOOLS", "run_tool", "run_all"]

@@ -114,7 +114,11 @@ def _resolve_external_config(external: dict[str, Any], run_ctx: dict[str, Any]) 
 def _tool_cfg(global_ext: dict[str, Any], tool: str) -> dict[str, Any]:
     """Effective config for one tool: per-tool keys + inherited globals."""
     cfg: dict[str, Any] = dict(global_ext.get(tool, {}) or {})
-    cfg.setdefault("enabled", global_ext.get("enabled", False))
+    # The top-level switch is a hard gate, not a default value.  A per-tool
+    # switch must never bypass ``external.enabled=false``.
+    cfg["enabled"] = bool(global_ext.get("enabled", False)) and bool(
+        cfg.get("enabled", False)
+    )
     cfg.setdefault("workdir", global_ext.get("workdir", "./tmp/external"))
     cfg.setdefault("timeout_s", global_ext.get("timeout_s", 3600))
     return cfg

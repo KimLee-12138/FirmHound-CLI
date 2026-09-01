@@ -82,8 +82,10 @@ class KleeAnalyzer(ExternalAnalyzer):
                 )
             if not docker_image_exists(self.image):
                 return ProbeResult(
-                    available=False, backend="docker",
-                    missing=[f"image:{self.image}"], notes=f"docker pull {self.image}",
+                    available=False,
+                    backend="docker",
+                    missing=[f"image:{self.image}"],
+                    notes=f"docker pull {self.image}",
                 )
             return ProbeResult(
                 available=True, version=self._image_version(), backend="docker", notes=detail
@@ -96,7 +98,9 @@ class KleeAnalyzer(ExternalAnalyzer):
             res = run_local(probe_cmd, timeout=30.0)
         if res.status == "missing":
             return ProbeResult(
-                available=False, backend=backend, missing=["klee"],
+                available=False,
+                backend=backend,
+                missing=["klee"],
                 notes="KLEE not found on backend; install klee (llvm-16 + z3) or use docker",
             )
         if res.status != "ok":
@@ -105,7 +109,9 @@ class KleeAnalyzer(ExternalAnalyzer):
             )
         version = self._parse_version(res.stdout + res.stderr)
         return ProbeResult(
-            available=True, version=version, backend=backend,
+            available=True,
+            version=version,
+            backend=backend,
             notes=f"klee available via {backend}",
         )
 
@@ -171,15 +177,17 @@ class KleeAnalyzer(ExternalAnalyzer):
             sink = cand.get("sink") or {}
             harness_map[dir_name] = {
                 "binary_id": str(cand.get("binary_id") or "unknown"),
-                "vuln_class": str(cand.get("vuln_class") or "other"),
+                "vuln_class": str(
+                    cand.get("vuln_class") or cand.get("vuln_class_hypothesis") or "other"
+                ),
                 "sink": {
                     "function": str(sink.get("function") or cand.get("sink_func") or ""),
                     "addr": str(sink.get("addr") or ""),
                     "type": str(sink.get("type") or ""),
                 },
                 "source": cand.get("source") or {"type": "unknown"},
-                "entry_point": cand.get("entry_point") or {"type": "unknown"},
-                "call_trace": cand.get("call_trace") or [],
+                "entry_point": cand.get("entry_point") or cand.get("entry") or {"type": "unknown"},
+                "call_trace": cand.get("call_trace") or cand.get("call_chain") or [],
                 "constraints": cand.get("constraints") or [],
                 "c_path": str(res.c_path),
                 "bc_path": str(res.bc_path) if res.bc_path else None,
@@ -209,8 +217,10 @@ class KleeAnalyzer(ExternalAnalyzer):
         harness_map = self._load_harness_map(ctx)
         if not harness_map:
             return RunOutcome(
-                status="ok", duration_s=0.0,
-                outputs=[], limitation="no candidates to symbolically execute",
+                status="ok",
+                duration_s=0.0,
+                outputs=[],
+                limitation="no candidates to symbolically execute",
             )
 
         backend = self._resolve_backend()
@@ -237,7 +247,8 @@ class KleeAnalyzer(ExternalAnalyzer):
         duration = time.time() - started
         if not any_artifacts:
             return RunOutcome(
-                status="failed", duration_s=duration,
+                status="failed",
+                duration_s=duration,
                 limitation=(
                     "no KLEE artifact produced (klee/clang unavailable on backend "
                     "or every harness failed)"
@@ -255,9 +266,7 @@ class KleeAnalyzer(ExternalAnalyzer):
         except Exception:
             return {}
 
-    def _ensure_bc(
-        self, entry: dict[str, Any], backend: str, log_path: Path
-    ) -> Path | None:
+    def _ensure_bc(self, entry: dict[str, Any], backend: str, log_path: Path) -> Path | None:
         """Return a ``.bc`` path for one harness, compiling/lifting on the backend."""
         strategy = entry.get("strategy", "harness")
         c_path = Path(entry["c_path"]) if entry.get("c_path") else None
@@ -283,8 +292,10 @@ class KleeAnalyzer(ExternalAnalyzer):
             cont_bc = f"/work/{bc_path.name}"
             cont_cmd = ["clang", "-emit-llvm", "-c", "-O0", "-g", cont_c, "-o", cont_bc]
             res = run_docker(
-                self.image, ["sh", "-c", " ".join(cont_cmd)],
-                mounts={c_path.parent: "/work"}, timeout=300.0,
+                self.image,
+                ["sh", "-c", " ".join(cont_cmd)],
+                mounts={c_path.parent: "/work"},
+                timeout=300.0,
             )
         else:
             res = run_local(host_cmd, timeout=300.0)
@@ -296,9 +307,7 @@ class KleeAnalyzer(ExternalAnalyzer):
             log_path.write_text(note, encoding="utf-8")
         return None
 
-    def _lift_binary(
-        self, entry: dict[str, Any], backend: str, log_path: Path
-    ) -> Path | None:
+    def _lift_binary(self, entry: dict[str, Any], backend: str, log_path: Path) -> Path | None:
         """S3: lift an ELF to LLVM IR (mcsema/retDec). Allowed to fail (honest)."""
         note = (
             "S3 binary-lift skipped: mcsema/retDec not available for MIPS/ARM on this "
@@ -325,7 +334,8 @@ class KleeAnalyzer(ExternalAnalyzer):
             res = run_wsl(cmd, timeout=float(self.timeout_s))
         elif backend == "docker":
             res = run_docker(
-                self.image, cmd,
+                self.image,
+                cmd,
                 mounts={bc.parent: "/work", out_dir: str(out_dir)},
                 timeout=float(self.timeout_s),
             )

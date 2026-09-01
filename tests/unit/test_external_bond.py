@@ -6,10 +6,7 @@ assert that a non-private target yields ``status="unsafe"`` with ZERO outbound a
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-
-import pytest
 
 from tools.external.base import AnalysisContext
 from tools.external.bond.mini.ghidra_export import identify_entry_points
@@ -17,7 +14,6 @@ from tools.external.bond.mini.scheduler import generate_seeds
 from tools.external.bond.mini.template import generate_template
 from tools.external.bond.parser import parse_bond_output
 from tools.external.bond.runner import BondAnalyzer
-from tools.external.bond.sanitize import sanitize_poc
 
 FIX = Path(__file__).resolve().parents[2] / "tools" / "external" / "bond" / "fixtures" / "raw"
 

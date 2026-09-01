@@ -54,8 +54,8 @@ class Planner:
         "STATIC_ANALYSIS",
         "EXTERNAL_ANALYSIS",
         "FUSION",
-        "RANK",
         "SYMEX_PRUNE",
+        "RANK",
         "VERIFY_TOP_K",
         "LOCAL_VALIDATION",
         "CONSTRAINED_VALIDATION",
@@ -235,14 +235,18 @@ class Planner:
                 "EXTERNAL_ANALYSIS": {
                     "tool": "tools.external.run_all",
                     "required": False,
+                    "args": {"phase": "upstream"},
                 },
                 "FUSION": {
                     "tool": "tools.analysis.finding_fusion",
                     "required": False,
                 },
-                "SYMEX_PRUNE": {"tool": "tools.external.klee", "required": False},
+                "SYMEX_PRUNE": {
+                    "tool": "tools.external.klee.prune",
+                    "required": False,
+                },
                 "CONSTRAINED_VALIDATION": {
-                    "tool": "tools.external.bond",
+                    "tool": "tools.external.bond.validate",
                     "required": False,
                 },
                 "RANK": {"tool": "tools.audit.rank", "required": True},

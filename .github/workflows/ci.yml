@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install project and CI dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Deterministic unit suite
+        run: python scripts/dev.py test
+      - name: External adapter probe (missing tools degrade)
+        run: python scripts/dev.py ext-smoke
+      - name: Full-depth no-tool regression
+        run: python scripts/run_pipeline.py --depth full --out-dir runs/ci-full
+      - name: Verify full-depth artifacts
+        run: |
+          test -f runs/ci-full/ranking.json
+          test -f runs/ci-full/verdicts.json
+          test -f runs/ci-full/report.md
+          test -f runs/ci-full/artifacts/unified_candidates.json
+
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install lint dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Ruff check
+        run: python -m ruff check fsa tools scripts tests

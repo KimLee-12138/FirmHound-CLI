@@ -53,11 +53,14 @@ TRANSITIONS: dict[str, tuple[str, str | None]] = {
     Stage.DECOMPILE.value: (Stage.STATIC_ANALYSIS.value, Stage.STATIC_ANALYSIS.value),
     Stage.STATIC_ANALYSIS.value: (Stage.EXTERNAL_ANALYSIS.value, None),
     Stage.EXTERNAL_ANALYSIS.value: (Stage.FUSION.value, None),
-    Stage.FUSION.value: (Stage.RANK.value, None),
-    Stage.RANK.value: (Stage.SYMEX_PRUNE.value, None),
-    Stage.SYMEX_PRUNE.value: (Stage.VERIFY_TOP_K.value, None),
+    Stage.FUSION.value: (Stage.SYMEX_PRUNE.value, Stage.RANK.value),
+    Stage.SYMEX_PRUNE.value: (Stage.RANK.value, Stage.RANK.value),
+    Stage.RANK.value: (Stage.VERIFY_TOP_K.value, None),
     Stage.VERIFY_TOP_K.value: (Stage.LOCAL_VALIDATION.value, None),
-    Stage.LOCAL_VALIDATION.value: (Stage.CONSTRAINED_VALIDATION.value, Stage.CONSTRAINED_VALIDATION.value),
+    Stage.LOCAL_VALIDATION.value: (
+        Stage.CONSTRAINED_VALIDATION.value,
+        Stage.CONSTRAINED_VALIDATION.value,
+    ),
     Stage.CONSTRAINED_VALIDATION.value: (Stage.REPORT.value, Stage.REPORT.value),
     Stage.REPORT.value: (Stage.DONE.value, None),
 }
@@ -188,7 +191,9 @@ class Orchestrator:
             return self._state_manager.load()  # type: ignore[union-attr]
 
         try:
-            result = self.registry.call(tool_name, {"run_dir": str(self._run_dir)})
+            tool_args = {"run_dir": str(self._run_dir)}
+            tool_args.update(stage_cfg.get("args", {}))
+            result = self.registry.call(tool_name, tool_args)
         except Exception as exc:  # noqa: BLE001
             result = ToolResult(status="error", stderr=str(exc))
 

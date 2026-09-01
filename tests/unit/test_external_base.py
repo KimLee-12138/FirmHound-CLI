@@ -17,8 +17,6 @@ from tools.external.base import (
     ExternalAnalyzer,
     ProbeResult,
     RunOutcome,
-    normalize_addr,
-    normalize_binary_id,
 )
 
 

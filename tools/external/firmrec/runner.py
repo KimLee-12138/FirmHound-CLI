@@ -29,7 +29,6 @@ from typing import Any
 from tools.external.backends import (
     docker_available,
     docker_image_exists,
-    run_container_cmd,
     run_docker,
 )
 from tools.external.base import AnalysisContext, ExternalAnalyzer, ProbeResult, RunOutcome

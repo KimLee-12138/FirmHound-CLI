@@ -135,10 +135,14 @@ class SatcAnalyzer(ExternalAnalyzer):
             for idx, bin_arg in enumerate(bin_args):
                 out_dir = ctx.output_dir(f"{script}-{idx}")
                 cmd = [
-                    "python", "satc.py",
-                    "-d", "/work/rootfs",
-                    "-o", "/work/out",
-                    "--ghidra_script", script,
+                    "python",
+                    "satc.py",
+                    "-d",
+                    "/work/rootfs",
+                    "-o",
+                    "/work/out",
+                    "--ghidra_script",
+                    script,
                 ]
                 if self.taint_check:
                     cmd.append("--taint_check")
@@ -169,11 +173,16 @@ class SatcAnalyzer(ExternalAnalyzer):
             if (ref2share_out).exists():
                 out_dir = ctx.output_dir("share2sink-0")
                 cmd = [
-                    "python", "satc.py",
-                    "-d", "/work/rootfs",
-                    "-o", "/work/out",
-                    "--ghidra_script", NEEDS_REF2SHARE,
-                    "--ref2share_result", "/work/ref2share",
+                    "python",
+                    "satc.py",
+                    "-d",
+                    "/work/rootfs",
+                    "-o",
+                    "/work/out",
+                    "--ghidra_script",
+                    NEEDS_REF2SHARE,
+                    "--ref2share_result",
+                    "/work/ref2share",
                 ]
                 if self.taint_check:
                     cmd.append("--taint_check")
@@ -212,7 +221,9 @@ class SatcAnalyzer(ExternalAnalyzer):
     def parse(self, ctx: AnalysisContext, outcome: RunOutcome) -> list[dict[str, Any]]:
         findings: list[dict[str, Any]] = []
         limitations: list[str] = []
-        for out_dir in sorted((ctx.workdir / "out").iterdir()) if (ctx.workdir / "out").exists() else []:
+        for out_dir in (
+            sorted((ctx.workdir / "out").iterdir()) if (ctx.workdir / "out").exists() else []
+        ):
             if not out_dir.is_dir():
                 continue
             partial, stats = parse_satc_output(

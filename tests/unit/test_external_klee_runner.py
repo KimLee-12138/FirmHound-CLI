@@ -21,7 +21,6 @@ from tools.external.klee.prune import (
 )
 from tools.external.klee.runner import KleeAnalyzer
 
-
 # --------------------------------------------------------------------------- #
 # runner.prepare
 # --------------------------------------------------------------------------- #
@@ -39,10 +38,17 @@ def _ctx(workdir: Path, candidates):
 
 def test_prepare_writes_harness_map(tmp_path):
     candidates = [
-        {"binary_id": "sbin/httpd", "vuln_class": "command_injection",
-         "sink": {"function": "system", "addr": "0x40a100", "type": "command_execution"}},
-        {"binary_id": "sbin/upnpd", "vuln_class": "overflow",
-         "sink": {"function": "strcpy", "addr": "0x40b200", "type": "memory_copy"}, "buf_size": 32},
+        {
+            "binary_id": "sbin/httpd",
+            "vuln_class": "command_injection",
+            "sink": {"function": "system", "addr": "0x40a100", "type": "command_execution"},
+        },
+        {
+            "binary_id": "sbin/upnpd",
+            "vuln_class": "overflow",
+            "sink": {"function": "strcpy", "addr": "0x40b200", "type": "memory_copy"},
+            "buf_size": 32,
+        },
     ]
     analyzer = KleeAnalyzer({"harness": "auto"})
     ctx = _ctx(tmp_path / "w", candidates)
@@ -55,9 +61,14 @@ def test_prepare_writes_harness_map(tmp_path):
 
 
 def test_prepare_with_source_path_selects_s1(tmp_path):
-    candidates = [{"binary_id": "sbin/httpd", "vuln_class": "command_injection",
-                   "source_path": "/src/httpd.c",
-                   "sink": {"function": "system", "type": "command_execution"}}]
+    candidates = [
+        {
+            "binary_id": "sbin/httpd",
+            "vuln_class": "command_injection",
+            "source_path": "/src/httpd.c",
+            "sink": {"function": "system", "type": "command_execution"},
+        }
+    ]
     analyzer = KleeAnalyzer({"harness": "auto"})
     ctx = _ctx(tmp_path / "w", candidates)
     analyzer.prepare(ctx)
@@ -80,7 +91,10 @@ def test_probe_does_not_raise():
 def test_infeasible_writes_counterevidence_only():
     cand = {"finding_id": "c1", "conclusion_category": "suspect"}
     out = prune_candidate(
-        cand, {"reachable": False, "reason": "infeasible"}, finding_id="klee-x-0", harness_version="v1"
+        cand,
+        {"reachable": False, "reason": "infeasible"},
+        finding_id="klee-x-0",
+        harness_version="v1",
     )
     assert "klee:infeasible:v1:klee-x-0" in out["counterevidence"]
     # The candidate is NEVER deleted or flipped.

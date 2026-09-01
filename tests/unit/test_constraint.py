@@ -6,7 +6,6 @@ Covers the three inference rules and the mandatory > partial > none priority ord
 from __future__ import annotations
 
 from tools.external.bond.mini.constraint import (
-    KLASS_ORDER,
     extract_constraints,
     parse_constraint_expr,
     priority_order,

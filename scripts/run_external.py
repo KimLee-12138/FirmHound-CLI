@@ -36,7 +36,6 @@ if str(_ROOT) not in sys.path:
 from tools.external.adapter import run_bond, run_firmrec, run_klee, run_satc  # noqa: E402
 from tools.external.run_all import run_all  # noqa: E402
 
-
 _DISPATCH = {
     "satc": run_satc,
     "firmrec": run_firmrec,
@@ -46,15 +45,19 @@ _DISPATCH = {
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run an external analyzer against a run directory.")
+    parser = argparse.ArgumentParser(
+        description="Run an external analyzer against a run directory."
+    )
     parser.add_argument("--tool", required=True, choices=["satc", "firmrec", "klee", "bond", "all"])
     parser.add_argument("--run-dir", required=True, help="Pipeline run directory.")
-    parser.add_argument("--config", default=None, help="Optional YAML config overriding config/dev.yaml.")
+    parser.add_argument(
+        "--config", default=None, help="Optional YAML config overriding config/dev.yaml."
+    )
     args = parser.parse_args(argv)
 
     run_dir = Path(args.run_dir)
     if not run_dir.exists():
-        print(f"error: run-dir does not exist: {run_dir}", file=sys.stderr)
+        sys.stderr.write(f"error: run-dir does not exist: {run_dir}\n")
         return 2
 
     if args.tool == "all":
@@ -62,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         result = _DISPATCH[args.tool](run_dir, args.config)
 
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    sys.stdout.write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
     return 0
 
 

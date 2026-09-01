@@ -18,14 +18,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from fsa.orchestrator.verifier import CandidateVerifier
-from fsa.utils.jsonio import save_json
-from tools.analysis.risk_score import rank_candidates, select_top
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from fsa.orchestrator.verifier import CandidateVerifier  # noqa: E402
+from fsa.utils.jsonio import save_json  # noqa: E402
+from tools.analysis.finding_fusion import fuse  # noqa: E402
+from tools.analysis.risk_score import rank_candidates, select_top  # noqa: E402
+from tools.external.bond.validate import execute_validation  # noqa: E402
+from tools.external.klee.prune import execute_prune  # noqa: E402
+from tools.external.run_all import run_all  # noqa: E402
+
 BENCHMARK_DIR = REPO_ROOT / "benchmarks" / "CVEs"
 
 _ACTION_LABEL = {
@@ -68,19 +76,75 @@ def run_pipeline(
     run_dir: str | Path,
     *,
     top_k: int = 5,
+    depth: str = "standard",
+    config_path: str | None = None,
+    blind: bool = True,
 ) -> dict[str, Any]:
-    """Run scoring → ranking → selection → verification and return the result."""
+    """Run the baseline or full dual-track pipeline and return its result."""
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = run_dir / "artifacts"
+    state_dir = run_dir / "state"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    save_json(artifacts_dir / "candidates.json", {"candidates": candidates})
+    save_json(artifacts_dir / "attack_surface.json", attack_surface)
+    save_json(state_dir / "task_card.json", {"blind": blind, "depth": depth})
 
-    ranked = rank_candidates(candidates)
+    external: dict[str, Any] = {
+        "status": "skipped",
+        "limitation": "depth=standard; external analyzer track not requested",
+    }
+    working_candidates = candidates
+    if depth == "full":
+        upstream = run_all(run_dir, config_path, phase="upstream")
+        fusion = fuse(run_dir, config_path)
+        symex = execute_prune(run_dir, config_path)
+        unified_path = artifacts_dir / "unified_candidates.json"
+        if unified_path.exists():
+            try:
+                working_candidates = json.loads(unified_path.read_text(encoding="utf-8")).get(
+                    "candidates", candidates
+                )
+            except (OSError, json.JSONDecodeError):
+                working_candidates = candidates
+        external = {
+            "status": "ok"
+            if upstream.get("status") == "ok" or symex.get("status") == "ok"
+            else "degraded",
+            "upstream": upstream,
+            "fusion": fusion,
+            "symex": symex,
+        }
+
+    ranked = rank_candidates(working_candidates)
     top = select_top(ranked, limit=top_k, keep_diversity=True)
 
     verifier = CandidateVerifier(run_dir)
     verdicts = verifier.review(top, attack_surface)
 
+    if depth == "full":
+        unified_path = artifacts_dir / "unified_candidates.json"
+        if unified_path.exists():
+            try:
+                unified_doc = json.loads(unified_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                unified_doc = {}
+            unified_doc["candidates"] = ranked
+            save_json(unified_path, unified_doc)
+        bond = execute_validation(run_dir, config_path)
+        external["bond"] = bond
+        if bond.get("status") == "ok" and bond.get("metrics", {}).get("applied", 0):
+            updated = json.loads(unified_path.read_text(encoding="utf-8")).get("candidates", ranked)
+            ranked = rank_candidates(updated)
+            top = select_top(ranked, limit=top_k, keep_diversity=True)
+            verdicts = verifier.review(top, attack_surface)
+
     result = {
+        "status": "ok",
         "run_dir": str(run_dir),
+        "depth": depth,
+        "blind": blind,
         "total_candidates": len(ranked),
         "top_k": len(top),
         "ranking": [
@@ -95,6 +159,7 @@ def run_pipeline(
             for i, c in enumerate(ranked, start=1)
         ],
         "verdicts": verdicts,
+        "external": external,
     }
     return result
 
@@ -143,6 +208,36 @@ def render_report(result: dict[str, Any]) -> str:
     lines.append("- 拒绝(REJECT)：source 非真实外部输入 / 不可控 / 未达 sink / 仅调试功能。")
     lines.append("- 需动态验证(NEED_DYNAMIC)：静态证据不足，需 M8 本地仿真补证。")
     lines.append("")
+    external = result.get("external") or {}
+    lines.extend(
+        [
+            "## 21. 外部工具交叉验证",
+            "",
+            f"- 外部轨状态：{external.get('status', 'skipped')}",
+        ]
+    )
+    if result.get("depth") != "full":
+        lines.append("- 本次为 standard 深度，SaTC / KLEE / BOND / FirmRec 均未参与。")
+    else:
+        upstream = external.get("upstream") or {}
+        symex = external.get("symex") or {}
+        bond = external.get("bond") or {}
+        fusion = external.get("fusion") or {}
+        lines.extend(
+            [
+                f"- 上游外部分析：{upstream.get('status', 'skipped')}，"
+                f"findings={upstream.get('findings', 0)}",
+                f"- 汇聚：external_only={fusion.get('summary', {}).get('external_only', 0)}，"
+                f"recurrence={fusion.get('summary', {}).get('recurrence', 0)}",
+                f"- KLEE：{symex.get('status', 'skipped')}，"
+                f"prune_rate={symex.get('metrics', {}).get('prune_rate', 0.0)}",
+                f"- BOND：{bond.get('status', 'skipped')}，"
+                f"confirmed={bond.get('metrics', {}).get('confirmed', 0)}",
+                "- FirmRec 结论依赖已知漏洞签名，独立保存，不计入 Blind Benchmark 指标。",
+                "- 仅允许已脱敏 (`poc_sanitized=true`) 的验证证据进入结论。",
+            ]
+        )
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -150,10 +245,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the static-analysis pipeline demo.")
     parser.add_argument("--out-dir", default=str(REPO_ROOT / "runs" / "pipeline"))
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--depth", choices=["standard", "full"], default="standard")
+    parser.add_argument("--config", default=None)
+    parser.add_argument(
+        "--blind",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Force recurrence-only tools out of benchmark results (default: true).",
+    )
     args = parser.parse_args()
 
     candidates, attack_surface = load_benchmark()
-    result = run_pipeline(candidates, attack_surface, args.out_dir, top_k=args.top_k)
+    result = run_pipeline(
+        candidates,
+        attack_surface,
+        args.out_dir,
+        top_k=args.top_k,
+        depth=args.depth,
+        config_path=args.config,
+        blind=args.blind,
+    )
 
     out_dir = Path(args.out_dir)
     save_json(out_dir / "ranking.json", result["ranking"])
@@ -161,8 +272,8 @@ def main() -> int:
     report = render_report(result)
     (out_dir / "report.md").write_text(report, encoding="utf-8")
 
-    print(report)
-    print(f"\nArtifacts written to {out_dir}")
+    sys.stdout.write(report)
+    sys.stdout.write(f"\n\nArtifacts written to {out_dir}\n")
     return 0
 
 

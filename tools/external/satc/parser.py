@@ -45,14 +45,32 @@ PARSER_VERSION = "satc-parser-v1"
 
 # Command-execution sinks -> command_injection
 _CMDI_SINKS = {
-    "system", "__system", "popen", "execl", "execlp", "execle",
-    "execv", "execvp", "execve", "doSystemCmd", "lxmldbc_system",
-    "alpha_system2", "twsystem",
+    "system",
+    "__system",
+    "popen",
+    "execl",
+    "execlp",
+    "execle",
+    "execv",
+    "execvp",
+    "execve",
+    "doSystemCmd",
+    "lxmldbc_system",
+    "alpha_system2",
+    "twsystem",
 }
 # Memory-copy sinks -> overflow
 _BOF_SINKS = {
-    "strcpy", "strcat", "sprintf", "vsprintf", "memcpy", "gets",
-    "scanf", "sscanf", "wcscpy", "lstrcpy",
+    "strcpy",
+    "strcat",
+    "sprintf",
+    "vsprintf",
+    "memcpy",
+    "gets",
+    "scanf",
+    "sscanf",
+    "wcscpy",
+    "lstrcpy",
 }
 _ALL_SINKS = _CMDI_SINKS | _BOF_SINKS
 
@@ -130,9 +148,7 @@ def parse_detail_map(path: Path, stats: ParseStats | None = None) -> dict[str, l
     return mapping
 
 
-def parse_clustering(
-    path: Path, stats: ParseStats | None = None
-) -> list[dict[str, Any]]:
+def parse_clustering(path: Path, stats: ParseStats | None = None) -> list[dict[str, Any]]:
     """Parse ``Clustering_result_v2.result``: keyword <-> border binary matches.
 
     This is the highest-value artifact: it is the front-end-keyword to
@@ -307,10 +323,10 @@ def parse_satc_output(
     # 1-9: keyword extraction artifacts (context / evidence).
     api_simple = parse_simple_list(kw_simple_dir / "API_simple.result", stats)
     prar_simple = parse_simple_list(kw_simple_dir / "Prar_simple.result", stats)
-    api_detail = parse_detail_map(kw_detail_dir / "API_detail.result", stats)
+    parse_detail_map(kw_detail_dir / "API_detail.result", stats)
     prar_detail = parse_detail_map(kw_detail_dir / "Prar_detail.result", stats)
     clustering = parse_clustering(kw_detail_dir / "Clustering_result_v2.result", stats)
-    file_detail = parse_detail_map(kw_detail_dir / "File_detail.result", stats)
+    parse_detail_map(kw_detail_dir / "File_detail.result", stats)
     from_bin = parse_simple_list(kw_detail_dir / "from_bin_add_para.result", stats)
     skipped_js = parse_simple_list(kw_detail_dir / "Not_Analysise_JS_File.result", stats)
     parse_detail_map(kw_detail_dir / "api_split.result", stats)
@@ -326,8 +342,14 @@ def parse_satc_output(
 
     # 10-11: ghidra per-binary results, keyed by (binary, sink addr).
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
-    for bin_dir in sorted(p for p in ghidra_dir.iterdir() if p.is_dir()) if ghidra_dir.exists() else []:
-        binary_id = normalize_binary_id(rootfs, rootfs / bin_dir.name) if (rootfs / bin_dir.name).exists() else bin_dir.name
+    for bin_dir in (
+        sorted(p for p in ghidra_dir.iterdir() if p.is_dir()) if ghidra_dir.exists() else []
+    ):
+        binary_id = (
+            normalize_binary_id(rootfs, rootfs / bin_dir.name)
+            if (rootfs / bin_dir.name).exists()
+            else bin_dir.name
+        )
         for result_file in sorted(bin_dir.iterdir()):
             if not result_file.is_file() or ".result" not in result_file.name:
                 continue
@@ -355,7 +377,9 @@ def parse_satc_output(
     # 12: final alert files override / add sink addresses.
     alert_addrs: dict[tuple[str, str], bool] = {}
     for alert_file in sorted(out.glob("result-*.txt")):
-        match = re.match(r"result-(?P<bin>.+?)-(?P<script>.+?)-(?P<rand>[A-Za-z0-9]+)\.txt$", alert_file.name)
+        match = re.match(
+            r"result-(?P<bin>.+?)-(?P<script>.+?)-(?P<rand>[A-Za-z0-9]+)\.txt$", alert_file.name
+        )
         script = match.group("script") if match else ""
         bin_hint = match.group("bin") if match else ""
         for alert in parse_alert_file(alert_file, stats):
@@ -363,12 +387,16 @@ def parse_satc_output(
             if not addr:
                 continue
             matched_key = None
-            for (bin_id, sink_addr) in by_key:
+            for bin_id, sink_addr in by_key:
                 if sink_addr == addr:
                     matched_key = (bin_id, sink_addr)
                     break
             if matched_key is None:
-                binary_id = normalize_binary_id(rootfs, rootfs / bin_hint) if (rootfs / bin_hint).exists() else bin_hint
+                binary_id = (
+                    normalize_binary_id(rootfs, rootfs / bin_hint)
+                    if (rootfs / bin_hint).exists()
+                    else bin_hint
+                )
                 matched_key = (binary_id, addr)
                 by_key[matched_key] = {
                     "binary_id": binary_id,
@@ -391,7 +419,9 @@ def parse_satc_output(
         vuln_class = entry["vuln_class"]
         trace = entry["call_trace"]
         # Attribute keywords to this binary when the clustering says so.
-        own_keywords = [k for k, b in keyword_to_binary.items() if b == binary_id or b.endswith(binary_id)]
+        own_keywords = [
+            k for k, b in keyword_to_binary.items() if b == binary_id or b.endswith(binary_id)
+        ]
         params = own_keywords[:8] or source_names
         confidence = compute_confidence(
             has_alert_addr=has_alert,

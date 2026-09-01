@@ -7,7 +7,10 @@ Commands:
     help          Show this help message
     install       Install production dependencies
     dev           Install package in editable mode with dev dependencies
-    test          Run all tests with pytest
+    test          Run deterministic unit tests
+    test-all      Run unit + optional host integration tests
+    integration   Run host integration tests only
+    ext-smoke     Probe all four optional external analyzers
     lint          Run ruff check
     format        Run ruff format
     clean         Remove build artifacts and caches
@@ -25,16 +28,27 @@ import subprocess
 import sys
 from pathlib import Path
 
+import structlog
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 PYTHON = sys.executable
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
+        structlog.processors.JSONRenderer(),
+    ]
+)
+LOG = structlog.get_logger("dev")
 
 
 def run(cmd: list[str] | str, *, cwd: Path | None = None) -> int:
     """Run a command and return its exit code."""
     if isinstance(cmd, list):
-        print("$ " + " ".join(cmd))
+        LOG.info("command_start", command=cmd)
     else:
-        print("$ " + cmd)
+        LOG.info("command_start", command=cmd)
     return subprocess.call(cmd, shell=isinstance(cmd, str), cwd=cwd)
 
 
@@ -57,22 +71,81 @@ def cmd_dev(args: argparse.Namespace) -> int:
     return run([PYTHON, "-m", "pip", "install", "-e", "."], cwd=REPO_ROOT)
 
 
-def cmd_test(args: argparse.Namespace) -> int:
-    """Run pytest with optional WSL tool wrappers on Windows."""
-    wrappers = REPO_ROOT / "tools" / "wsl_wrappers"
+def _pytest(paths: list[str], *, with_wsl_wrappers: bool = False) -> int:
+    """Run pytest with optional WSL wrappers and an explicit test scope."""
     env = os.environ.copy()
-    env["PATH"] = str(wrappers) + os.pathsep + env.get("PATH", "")
-    return subprocess.call([PYTHON, "-m", "pytest"], cwd=REPO_ROOT, env=env)
+    if with_wsl_wrappers and os.name == "nt":
+        wrappers = REPO_ROOT / "tools" / "wsl_wrappers"
+        env["PATH"] = str(wrappers) + os.pathsep + env.get("PATH", "")
+    return subprocess.call([PYTHON, "-m", "pytest", *paths], cwd=REPO_ROOT, env=env)
+
+
+def cmd_test(args: argparse.Namespace) -> int:
+    """Run the deterministic CI unit-test suite."""
+    return _pytest(["tests/unit"])
+
+
+def cmd_test_all(args: argparse.Namespace) -> int:
+    """Run unit tests plus host-dependent integration tests."""
+    return _pytest(["tests"], with_wsl_wrappers=True)
+
+
+def cmd_integration(args: argparse.Namespace) -> int:
+    """Run host-dependent integration tests only."""
+    return _pytest(["tests/integration"], with_wsl_wrappers=True)
+
+
+def cmd_ext_smoke(args: argparse.Namespace) -> int:
+    """Probe optional external analyzers without requiring them to be installed."""
+    from tools.external.adapter import EXTERNAL_TOOLS, _build_analyzer, _load_global_external
+
+    external = _load_global_external()
+    results: dict[str, dict[str, object]] = {}
+    for tool in EXTERNAL_TOOLS:
+        cfg = dict(external.get(tool, {}) or {})
+        analyzer = _build_analyzer(tool, cfg)
+        if analyzer is None:
+            results[tool] = {
+                "status": "failed",
+                "available": False,
+                "limitation": "adapter could not be constructed",
+            }
+            continue
+        try:
+            probe = analyzer.probe()
+            results[tool] = {
+                "status": "ok" if probe.available else "degraded",
+                "available": probe.available,
+                "version": probe.version,
+                "backend": probe.backend,
+                "missing": probe.missing,
+                "limitation": probe.notes,
+            }
+        except Exception as exc:  # noqa: BLE001 - smoke must report every tool
+            results[tool] = {
+                "status": "failed",
+                "available": False,
+                "limitation": f"{type(exc).__name__}: {exc}",
+            }
+    overall = "ok" if all(item["status"] == "ok" for item in results.values()) else "degraded"
+    LOG.info("external_probe_complete", status=overall, tools=results)
+    return 0
 
 
 def cmd_lint(args: argparse.Namespace) -> int:
     """Run ruff check."""
-    return run([PYTHON, "-m", "ruff", "check", "fsa", "tools", "tests"], cwd=REPO_ROOT)
+    return run(
+        [PYTHON, "-m", "ruff", "check", "fsa", "tools", "scripts", "tests"],
+        cwd=REPO_ROOT,
+    )
 
 
 def cmd_format(args: argparse.Namespace) -> int:
     """Run ruff format."""
-    return run([PYTHON, "-m", "ruff", "format", "fsa", "tools", "tests"], cwd=REPO_ROOT)
+    return run(
+        [PYTHON, "-m", "ruff", "format", "fsa", "tools", "scripts", "tests"],
+        cwd=REPO_ROOT,
+    )
 
 
 def cmd_clean(args: argparse.Namespace) -> int:
@@ -96,7 +169,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
     for pycache in REPO_ROOT.rglob("__pycache__"):
         if pycache.is_dir():
             shutil.rmtree(pycache)
-    print("Cleaned build artifacts and caches.")
+    LOG.info("clean_complete", status="ok")
     return 0
 
 
@@ -140,7 +213,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("help", help="Show this help message")
     sub.add_parser("install", help="Install production dependencies")
     sub.add_parser("dev", help="Install editable package and dev dependencies")
-    sub.add_parser("test", help="Run all tests with pytest")
+    sub.add_parser("test", help="Run deterministic unit tests with pytest")
+    sub.add_parser("test-all", help="Run unit and optional integration tests")
+    sub.add_parser("integration", help="Run host integration tests")
+    sub.add_parser("ext-smoke", help="Probe optional external analyzers")
     sub.add_parser("lint", help="Run ruff check")
     sub.add_parser("format", help="Run ruff format")
     sub.add_parser("clean", help="Remove build artifacts and caches")
@@ -154,6 +230,9 @@ def main(argv: list[str] | None = None) -> int:
         "install": cmd_install,
         "dev": cmd_dev,
         "test": cmd_test,
+        "test-all": cmd_test_all,
+        "integration": cmd_integration,
+        "ext-smoke": cmd_ext_smoke,
         "lint": cmd_lint,
         "format": cmd_format,
         "clean": cmd_clean,

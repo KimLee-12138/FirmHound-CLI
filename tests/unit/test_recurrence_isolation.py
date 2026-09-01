@@ -20,7 +20,6 @@ import yaml
 from tools.analysis.finding_fusion import fuse
 from tools.external.adapter import _resolve_external_config, _run_tool
 
-
 # --------------------------------------------------------------------------- #
 # 1. blind run force-disables FirmRec at the config level
 # --------------------------------------------------------------------------- #

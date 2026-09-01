@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from fsa.schemas.loader import validate
 from tools.external.base import normalize_addr
 from tools.external.satc.parser import (
