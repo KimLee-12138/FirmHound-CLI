@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,43 @@ def test_planner_extract_from_nl(planner: Planner) -> None:
     assert card.get("vendor") == "Tenda"
     assert card.get("model") == "AC15"
     assert "/firmwares/ac15.bin" in (card.get("firmware_path") or "")
+
+
+def test_planner_extracts_safe_task_package(tmp_path: Path, planner: Planner) -> None:
+    fw = "firmware/ac15.bin"
+    package = tmp_path / "task.zip"
+    with zipfile.ZipFile(package, "w") as zf:
+        zf.writestr(fw, b"firmware")
+        zf.writestr("README.txt", "authorized lab task")
+
+    card = planner.parse_task(
+        {
+            "task_id": "T-004",
+            "task_package": str(package),
+            "authorization": "team",
+        }
+    )
+
+    assert fw in card["attachments"]
+    assert card["firmware_path"].replace("\\", "/").endswith("firmware/ac15.bin")
+    assert card["readme_text"] == "authorized lab task"
+
+
+def test_planner_rejects_zip_slip_member(tmp_path: Path, planner: Planner) -> None:
+    package = tmp_path / "bad.zip"
+    with zipfile.ZipFile(package, "w") as zf:
+        zf.writestr("../escape.bin", b"nope")
+
+    card = planner.parse_task(
+        {
+            "task_id": "T-005",
+            "task_package": str(package),
+            "authorization": "team",
+        }
+    )
+
+    assert card["requires_human_gate"] is True
+    assert any("Unsafe archive member" in reason for reason in card["human_gate_reasons"])
 
 
 def test_build_plan_depths(planner: Planner) -> None:

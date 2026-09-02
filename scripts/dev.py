@@ -26,6 +26,7 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import structlog
@@ -174,7 +175,21 @@ def cmd_clean(args: argparse.Namespace) -> int:
 
 
 def cmd_smoke(args: argparse.Namespace) -> int:
-    """Run end-to-end smoke test."""
+    """Run an end-to-end smoke test through the product CLI."""
+    suffix = uuid.uuid4().hex[:8]
+    rootfs = REPO_ROOT / "tmp" / f"dev-smoke-rootfs-{suffix}"
+    if rootfs.exists():
+        shutil.rmtree(rootfs)
+    (rootfs / "www" / "cgi-bin").mkdir(parents=True, exist_ok=True)
+    (rootfs / "etc" / "init.d").mkdir(parents=True, exist_ok=True)
+    (rootfs / "www" / "cgi-bin" / "ping.cgi").write_text(
+        '#!/bin/sh\neval "ping -c 4 $QUERY_STRING"\n',
+        encoding="utf-8",
+    )
+    (rootfs / "etc" / "init.d" / "S50web").write_text(
+        "httpd -h /www -p 80\n",
+        encoding="utf-8",
+    )
     return run(
         [
             PYTHON,
@@ -182,8 +197,16 @@ def cmd_smoke(args: argparse.Namespace) -> int:
             "fsa.cli",
             "--config",
             "config/dev.yaml",
-            "smoke",
-            "tests/fixtures/sample.bin",
+            "analyze",
+            str(rootfs),
+            "--input-type",
+            "rootfs",
+            "--depth",
+            "quick",
+            "--authorization-holder",
+            "local-smoke-fixture",
+            "--run-id",
+            f"dev-smoke-{suffix}",
         ],
         cwd=REPO_ROOT,
     )

@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20WSL2%20%7C%20Linux-2F6FAD)](docs/wsl_dev_guide.md)
-[![Tests](https://img.shields.io/badge/tests-189%20passed-1D9E75)]()
+[![Tests](https://img.shields.io/badge/tests-321%20passed%20%7C%203%20skipped-1D9E75)]()
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![CVE Benchmark](https://img.shields.io/badge/benchmark-9%20CVEs-534AB7)](benchmarks/CVEs)
 [![Skills](https://img.shields.io/badge/skills-9%20packs-0F6E56)](skills)
@@ -72,6 +72,7 @@
 ```bash
 # ① 安装 CLI 并自检
 python -m pip install -e .
+fsa doctor
 python scripts/dev.py test
 
 # ② 分析已解包 rootfs（授权主体为必填项）
@@ -398,9 +399,12 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 
 | 命令 | 用途 | 产物 |
 |---|---|---|
+| `fsa doctor [--include-external-probes]` | 检查本机路径、Schema、运行时、外部工具可用性 | readiness 状态，缺外部工具时降级说明 |
+| `fsa plan --task <自然语言任务> [--task-package task.zip]` | 只解析任务并展示执行计划，不运行分析 | task_card 摘要与阶段列表 |
 | `fsa analyze <固件或rootfs> --authorization-holder <授权主体>` | **正式分析入口**；自动识别文件/目录 | `runs/<run-id>/` 全量证据、状态、报告 |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
 | `fsa resume <run-id>` | 从第一个未完成阶段恢复 | 更新原运行目录 |
+| `python scripts/dev.py smoke` | 通过正式 `fsa analyze` 入口跑最小 rootfs 冒烟 | `runs/dev-smoke-*` |
 | `python scripts/dev.py test` | 跑全部单元测试 | — |
 | `python scripts/dev.py test-all` | 单元测试 + 主机相关集成测试 | — |
 | `python scripts/dev.py ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import re
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -103,6 +104,7 @@ class Planner:
             "version": input_data.get("version"),
             "depth": input_data.get("depth", "standard"),
             "constraints": input_data.get("constraints", []),
+            "attachments": [],
             "success_criteria": input_data.get(
                 "success_criteria", ["identify high-confidence vulnerabilities"]
             ),
@@ -140,7 +142,8 @@ class Planner:
         """Heuristic slot extraction from Chinese/English natural language."""
         # Path extraction: quoted paths or common extensions.
         path_re = re.compile(
-            r"['\"]([^'\"]+\.(?:bin|trx|chk|img|fw))['\"]|([\w\-/\\]+\.(?:bin|trx|chk|img|fw))",
+            r"['\"]([^'\"]+\.(?:bin|trx|chk|img|fw|zip))['\"]|"
+            r"([\w\-/\\]+\.(?:bin|trx|chk|img|fw|zip))",
             re.I,
         )
         for m in path_re.finditer(text):
@@ -193,13 +196,27 @@ class Planner:
         if not path.exists():
             return card
 
-        extracted = path.parent / "extracted_package"
+        extracted = path.parent / f"{path.stem}-{uuid.uuid4().hex[:8]}"
+        extracted.mkdir(parents=True, exist_ok=False)
         with zipfile.ZipFile(path, "r") as zf:
-            zf.extractall(extracted)
+            for member in zf.infolist():
+                target = (extracted / member.filename).resolve()
+                if not target.is_relative_to(extracted.resolve()):
+                    card["requires_human_gate"] = True
+                    card["human_gate_reasons"].append(
+                        f"Unsafe archive member path rejected: {member.filename}"
+                    )
+                    continue
+                if member.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zf.open(member) as src, target.open("wb") as dst:
+                    dst.write(src.read())
 
         for child in extracted.rglob("*"):
             if child.is_file():
-                rel = str(child.relative_to(extracted))
+                rel = child.relative_to(extracted).as_posix()
                 card["attachments"].append(rel)
                 # Treat first .bin/.chk/.img as firmware if not already set.
                 if not card.get("firmware_path") and child.suffix.lower() in {

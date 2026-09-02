@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import uuid
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -123,5 +125,61 @@ def test_cli_status_rejects_path_traversal() -> None:
         )
         assert result.exit_code != 0
         assert "run_id" in result.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_plan_from_natural_language_and_package() -> None:
+    workspace = (Path("tmp") / f"cli-plan-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        package = workspace / "task.zip"
+        with zipfile.ZipFile(package, "w") as zf:
+            zf.writestr("firmware/router.bin", b"firmware")
+            zf.writestr("README.txt", "authorized router analysis")
+
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "plan",
+                "--task",
+                "分析厂商为Tenda、型号AC15的固件，授权测试，完整分析。",
+                "--task-package",
+                str(package),
+                "--authorization-holder",
+                "fixture-owner",
+                "--json-output",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "ok"
+        assert payload["depth"] == "full"
+        assert payload["firmware_path"].replace("\\", "/").endswith("firmware/router.bin")
+        assert "EXTERNAL_ANALYSIS" in payload["stages"]
+        assert "firmware/router.bin" in payload["attachments"]
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_doctor_reports_readiness() -> None:
+    workspace = (Path("tmp") / f"cli-doctor-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        result = CliRunner().invoke(
+            main,
+            ["--config", str(config), "doctor", "--json-output"],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] in {"ok", "degraded"}
+        assert payload["checks"]["schemas"]["status"] == "ok"
+        assert payload["checks"]["paths"]["status"] == "ok"
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
