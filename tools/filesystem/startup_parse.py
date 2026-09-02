@@ -13,7 +13,15 @@ SERVICE_PATTERNS = [
     re.compile(r"^\s*(\S+/\S+)\s+(.+)$"),
 ]
 
-IGNORED_BINARIES = {"echo", "mkdir", "chmod", "chown", "rm", "cp", "mv", "sleep", "printf"}
+IGNORED_BINARIES = {
+    "echo", "mkdir", "chmod", "chown", "rm", "cp", "mv", "sleep", "printf",
+    # OpenWrt/busybox noise: short-lived commands and shell builtins are not
+    # long-running daemons and must never become daemon attack surfaces.
+    "[", "test", "grep", "sed", "awk", "cat", "ls", "head", "tail", "touch",
+    "date", "kill", "killall", "logger", "dmesg", "mknod", "mount", "umount",
+    "ifconfig", "ip", "insmod", "rmmod", "modprobe", "wget", "true", "false",
+    ":", ".", "source", "exit", "set", "export", "shift",
+}
 
 
 def parse_startup_script(path: Path) -> list[dict[str, Any]]:
@@ -61,6 +69,12 @@ def _extract_command(line: str) -> tuple[str, str]:
     if cleaned.startswith("/usr/bin/env "):
         cleaned = cleaned[len("/usr/bin/env ") :]
 
+    # inittab style: "id:runlevels:action:process" has no spaces, so the whole
+    # line used to be treated as the binary ("::sysinit:/etc/init.d/rcS").
+    if ":" in cleaned and " " not in cleaned and cleaned.startswith(":"):
+        cleaned = cleaned.split(":")[-1].strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+
     tokens = cleaned.split()
     if not tokens:
         return "", ""
@@ -71,6 +85,14 @@ def _extract_command(line: str) -> tuple[str, str]:
     if binary in ("eval", "source", ".") and len(tokens) > 1:
         binary = tokens[1]
         args = " ".join(tokens[2:])
+
+    # start-stop-daemon -S ... -x /usr/sbin/foo: the real service is the -x arg.
+    if Path(binary).name in {"start-stop-daemon", "ssd"}:
+        for i, token in enumerate(tokens):
+            if token in {"-x", "--exec"} and i + 1 < len(tokens):
+                binary = tokens[i + 1]
+                args = " ".join(tokens[i + 2:])
+                break
 
     return binary, args
 

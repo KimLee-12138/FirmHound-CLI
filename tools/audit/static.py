@@ -235,6 +235,12 @@ def execute_static(run_dir: str) -> dict[str, Any]:
             # keeps candidates.json focused on reachable attack surface.
             if not surface and source.get("type") not in network_types:
                 continue
+            # Filesystem sinks (open/fwrite/write_mtd/...) of an *unmapped*
+            # flash/updater binary are by-design behaviour, not a reachable
+            # attack surface; they used to flood candidates and outrank real
+            # web command injection in the ranking.
+            if sink.get("type") == "filesystem" and not surface:
+                continue
             candidate_id = _candidate_id(summary["binary_id"], source["type"], sink["function"])
             evidence = evidence_store.add(
                 run_id=run.name,
