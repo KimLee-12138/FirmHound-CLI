@@ -10,7 +10,126 @@ from fsa.reporting.evidence_store import EvidenceStore
 from fsa.schemas.loader import validate
 from fsa.utils.jsonio import save_json
 from tools.analysis.source_sink_rules import match_binary
+from tools.binary.call_chain import recover_chains
 from tools.pipeline_context import load_artifact, run_path, save_artifact
+
+# Sink imports worth recovering an actual call site for (ARM32 disassembly).
+_CHAIN_SINKS = {
+    "doSystemCmd",
+    "system",
+    "popen",
+    "execve",
+    "sprintf",
+    "vsprintf",
+    "strcpy",
+    "strncpy",
+    "memcpy",
+    "strcat",
+    "snprintf",
+}
+
+# API name -> verifier-recognised validation kind (mirrors source_sink rules).
+_KIND_BY_API = {
+    "strlen": "length_check",
+    "strncmp": "whitelist",
+    "strcmp": "whitelist",
+    "atoi": "type_limit",
+    "strtol": "type_limit",
+    "strtoul": "type_limit",
+    "strtok": "blacklist",
+    "isalpha": "charset_check",
+    "isdigit": "charset_check",
+}
+
+_chain_cache: dict[str, dict[str, Any]] = {}
+
+
+def _resolve_rootfs(run_dir: str) -> str:
+    payload = load_artifact(run_dir, "rootfs.json", {})
+    if isinstance(payload, dict):
+        return str(payload.get("rootfs_path") or "")
+    return ""
+
+
+def _enrich_with_chain(
+    candidate: dict[str, Any],
+    summary: dict[str, Any],
+    rootfs: str,
+    evidence_store: EvidenceStore,
+    run_id: str,
+) -> None:
+    """Attach a disassembly-backed call chain when one exists for this sink.
+
+    Uses :mod:`tools.binary.call_chain` (capstone, ARM32). Only upgrades the
+    candidate when a concrete enclosing function calling the sink was found --
+    otherwise the candidate keeps its honest "call-chain-not-proven" state.
+    """
+    sink_func = str((candidate.get("sink") or {}).get("function", ""))
+    binary_path = str(summary.get("path", ""))
+    if not (rootfs and binary_path and sink_func in _CHAIN_SINKS):
+        return
+    elf_path = Path(rootfs, binary_path)
+    if not elf_path.is_file():
+        return
+    cache_key = str(elf_path)
+    if cache_key not in _chain_cache:
+        try:
+            _chain_cache[cache_key] = recover_chains(elf_path, sink_functions=list(_CHAIN_SINKS))
+        except Exception:  # noqa: BLE001 - degrade, never abort a run
+            _chain_cache[cache_key] = {"status": "failed", "sink_callers": []}
+    report = _chain_cache[cache_key]
+    callers = report.get("sink_callers", []) or []
+    if not callers:
+        return
+    for caller in callers:
+        if caller.get("sink") != sink_func or caller.get("func_addr") is None:
+            continue
+        func_addr = caller["func_addr"]
+        candidate["call_chain"] = [
+            {
+                "addr": hex(func_addr),
+                "func": f"sub_{func_addr:x}",
+                "note": "enclosing function calls the sink",
+            },
+            {
+                "addr": hex(caller["call_addr"]),
+                "func": sink_func,
+                "note": "sink call site",
+            },
+        ]
+        filters = caller.get("same_func_filters", []) or []
+        if filters:
+            seen_kinds: set[str] = set()
+            validation = []
+            for api in filters:
+                kind = _KIND_BY_API.get(api, "other")
+                if kind in seen_kinds:
+                    continue
+                seen_kinds.add(kind)
+                validation.append({"api": api, "kind": kind, "same_function": True})
+            candidate["validation"] = validation
+        if "call-chain-not-proven" in candidate.get("counterevidence", []):
+            candidate["counterevidence"] = [
+                ce for ce in candidate["counterevidence"] if ce != "call-chain-not-proven"
+            ]
+        evidence_id = evidence_store.add(
+            run_id=run_id,
+            stage="DECOMPILE_FALLBACK",
+            type="decompile",
+            observation=(
+                f"ARM32 disassembly: function sub_{func_addr:x} calls {sink_func} "
+                f"at 0x{caller['call_addr']:x} in {binary_path}; "
+                f"same-function source-API read: {caller.get('same_func_source')}"
+            ),
+            tool="tools.binary.call_chain",
+            tool_version="1.0",
+            source_file=binary_path,
+            artifact_path=binary_path,
+            fact_status="confirmed",
+            supports=[candidate["candidate_id"]],
+        )
+        candidate["evidence"].append(evidence_id["evidence_id"])
+        break
 
 
 def _candidate_id(binary_id: str, source: str, sink: str) -> str:
@@ -79,6 +198,7 @@ def execute_static(run_dir: str) -> dict[str, Any]:
     surface_payload = load_artifact(run_dir, "attack_surface.json", {"surfaces": []})
     surfaces = surface_payload.get("surfaces", []) if isinstance(surface_payload, dict) else []
     run = run_path(run_dir)
+    rootfs_dir = _resolve_rootfs(run_dir)
     evidence_store = EvidenceStore(run)
     candidates: list[dict[str, Any]] = []
 
@@ -164,6 +284,9 @@ def execute_static(run_dir: str) -> dict[str, Any]:
                 "status": "analyzing",
             }
             validate(candidate, schema_name="candidate")
+            _enrich_with_chain(
+                candidate, summary, rootfs_dir, evidence_store, run.name
+            )
             candidates.append(candidate)
 
     result = {"run_id": run.name, "candidates": candidates}
