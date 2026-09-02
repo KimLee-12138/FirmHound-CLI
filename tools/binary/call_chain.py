@@ -198,7 +198,9 @@ def recover_chains(
     filters = set(filter_apis)
     exec_ranges = [(s["addr"], s["addr"] + len(s["data"])) for s in sections]
     rodata_ranges = [
-        (lo, hi) for lo, hi in all_ranges if not any(xlo <= lo and hi <= xhi for xlo, xhi in exec_ranges)
+        (lo, hi)
+        for lo, hi in all_ranges
+        if not any(xlo <= lo and hi <= xhi for xlo, xhi in exec_ranges)
     ]
 
     md = Cs(CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_LITTLE_ENDIAN)

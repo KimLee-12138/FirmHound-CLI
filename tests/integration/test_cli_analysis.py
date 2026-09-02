@@ -55,6 +55,7 @@ def _test_config(tmp_path: Path) -> Path:
                 "verify_top_k": 5,
             },
             "external": {"enabled": False},
+            "tools": {"use_wsl_wrappers": False},
         },
     )
     return config_path
@@ -125,6 +126,32 @@ def test_cli_status_rejects_path_traversal() -> None:
         )
         assert result.exit_code != 0
         assert "run_id" in result.output
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_plan_rejects_missing_firmware_path() -> None:
+    workspace = (Path("tmp") / f"cli-plan-missing-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        missing = workspace / "rootfs" / "missing.bin"
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "plan",
+                "--firmware-path",
+                str(missing),
+                "--authorization-holder",
+                "fixture-owner",
+                "--json-output",
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "firmware path not found" in result.output
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

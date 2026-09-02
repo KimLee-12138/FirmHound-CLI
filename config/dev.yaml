@@ -27,6 +27,10 @@ logging:
   format: jsonl
   destination: ./runs/logs
 
+tools:
+  use_wsl_wrappers: true
+  wsl_wrappers: ./tools/wsl_wrappers
+
 # --------------------------------------------------------------------------- #
 # External analyzers (SaTC / FirmRec / KLEE / BOND)
 #

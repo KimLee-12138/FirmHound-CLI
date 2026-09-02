@@ -34,13 +34,18 @@ def _binwalk_signatures(path: Path) -> list[dict[str, Any]]:
     """Run binwalk signature scan and parse matches."""
     if shutil.which("binwalk") is None:
         return []
-    result = run_command(["binwalk", "--signature", "--term", str(path)])
+    result = run_command(["binwalk", str(path)], timeout=120)
     if result.status != "success":
         return []
     matches: list[dict[str, Any]] = []
     for line in result.stdout.splitlines():
-        # Typical line: "123456 | 0x1E240 | Squashfs filesystem ..."
+        # Binwalk v3 JSON-ish table wrappers often print:
+        #   "123456 | 0x1E240 | Squashfs filesystem ..."
+        # while the classic CLI prints:
+        #   "123456       0x1E240        Squashfs filesystem ..."
         m = re.match(r"^\s*(\d+)\s+\|\s+(0x[0-9a-fA-F]+)\s+\|\s+(.+)$", line)
+        if not m:
+            m = re.match(r"^\s*(\d+)\s+(0x[0-9a-fA-F]+)\s+(.+)$", line)
         if m:
             matches.append(
                 {

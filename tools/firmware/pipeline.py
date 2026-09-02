@@ -48,9 +48,13 @@ def execute_unpack(
     best = scored.get("best")
     if not best:
         save_artifact(run_dir, "firmware_baseline.json", baseline)
+        save_artifact(run_dir, "firmware_unpack.json", extraction)
+        reason = "no rootfs candidate found after extraction"
+        if extraction.get("encrypted"):
+            reason = "encrypted firmware payload detected; decryption material is required"
         return {
             "status": "failed",
-            "reason": "no rootfs candidate found after extraction",
+            "reason": reason,
             "unpack": extraction,
         }
 

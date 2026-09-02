@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from fsa.utils.proc import RunResult
 from tools.firmware.arch_detect import detect_architecture
-from tools.firmware.collect_info import collect_info
+from tools.firmware.collect_info import _binwalk_signatures, collect_info
 from tools.firmware.rootfs_score import score_rootfs_candidates
 from tools.firmware.unpack import unpack
 
@@ -52,6 +53,27 @@ def test_rootfs_score_partial(tmp_path: Path) -> None:
     assert result["extraction_confidence"] < 1.0
 
 
+def test_rootfs_score_vendor_ro_layout(tmp_path: Path) -> None:
+    """Vendor readonly layouts such as etc_ro/webroot_ro score as rootfs."""
+    root = tmp_path / "extracted" / "rootfs"
+    (root / "bin").mkdir(parents=True)
+    (root / "sbin").mkdir(parents=True)
+    (root / "etc_ro" / "init.d").mkdir(parents=True)
+    (root / "lib").mkdir(parents=True)
+    (root / "usr").mkdir(parents=True)
+    (root / "webroot_ro").mkdir(parents=True)
+    (root / "bin" / "busybox").write_text("busybox", encoding="utf-8")
+    (root / "bin" / "httpd").write_text("httpd", encoding="utf-8")
+    (root / "etc_ro" / "init.d" / "rcS").write_text("#!/bin/sh\n", encoding="utf-8")
+
+    result = score_rootfs_candidates(root.parent)
+
+    assert result["best"]["path"] == str(root.resolve())
+    assert result["threshold_met"] is True
+    assert "has_etc" in result["best"]["markers"]
+    assert "has_web" in result["best"]["markers"]
+
+
 def test_collect_info_hashes(tmp_path: Path) -> None:
     """collect_info returns correct hashes and size."""
     fw = tmp_path / "fw.bin"
@@ -87,6 +109,147 @@ def test_unpack_carve_fallback(tmp_path: Path) -> None:
     assert result["fallback"]["status"] == "partial"
     carved = list(out.glob("carved_*"))
     assert carved
+
+
+def test_binwalk_parser_supports_classic_table(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Classic binwalk table output is parsed into offset signatures."""
+    fw = tmp_path / "fw.bin"
+    fw.write_bytes(b"firmware")
+
+    monkeypatch.setattr("tools.firmware.collect_info.shutil.which", lambda name: "/bin/binwalk")
+    monkeypatch.setattr(
+        "tools.firmware.collect_info.run_command",
+        lambda cmd, timeout=120: RunResult(
+            command="binwalk",
+            returncode=0,
+            stdout=(
+                "DECIMAL       HEXADECIMAL     DESCRIPTION\n"
+                "--------------------------------------------------------------------------------\n"
+                "64            0x40            TRX firmware header\n"
+                "1875608       0x1C9E98        Squashfs filesystem, little endian\n"
+            ),
+            stderr="",
+            status="success",
+        ),
+    )
+
+    signatures = _binwalk_signatures(fw)
+    assert signatures == [
+        {"offset": 64, "offset_hex": "0x40", "description": "TRX firmware header"},
+        {
+            "offset": 1875608,
+            "offset_hex": "0x1C9E98",
+            "description": "Squashfs filesystem, little endian",
+        },
+    ]
+
+
+def test_unpack_extracts_carved_squashfs_slice(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A carved inner SquashFS slice is retried with filesystem extractors."""
+    fw = tmp_path / "fw.bin"
+    fw.write_bytes(b"A" * 16 + b"hsqs" + b"B" * 32)
+    out = tmp_path / "out"
+
+    def fake_which(name: str) -> str | None:
+        if name in {"binwalk", "unsquashfs"}:
+            return f"/bin/{name}"
+        return None
+
+    def fake_binwalk(path: Path) -> list[dict[str, object]]:
+        return [{"offset": 0, "offset_hex": "0x0", "description": "custom encrypted header"}]
+
+    def fake_run_command(cmd: list[str], timeout: int = 300) -> RunResult:
+        extract_dir = Path(cmd[cmd.index("-d") + 1])
+        _make_rootfs(extract_dir)
+        return RunResult(
+            command=" ".join(cmd),
+            returncode=0,
+            stdout="",
+            stderr="",
+            status="success",
+        )
+
+    monkeypatch.setattr("tools.firmware.collect_info.shutil.which", fake_which)
+    monkeypatch.setattr("tools.firmware.unpack.shutil.which", fake_which)
+    monkeypatch.setattr("tools.firmware.collect_info._binwalk_signatures", fake_binwalk)
+    monkeypatch.setattr("tools.firmware.unpack.run_command", fake_run_command)
+
+    result = unpack(fw, out)
+    assert result["status"] == "success"
+    assert result["fallback"]["status"] == "success"
+    assert result["fallback"]["attempts"][0]["status"] == "extracted"
+    assert score_rootfs_candidates(out)["threshold_met"] is True
+
+
+def test_unpack_rejects_successful_empty_squashfs_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Extractor success without files is treated as failed."""
+    fw = tmp_path / "fw.bin"
+    fw.write_bytes(b"hsqs" + b"B" * 32)
+    out = tmp_path / "out"
+
+    def fake_which(name: str) -> str | None:
+        if name in {"binwalk", "unsquashfs"}:
+            return f"/bin/{name}"
+        return None
+
+    def fake_run_command(cmd: list[str], timeout: int = 300) -> RunResult:
+        extract_dir = Path(cmd[cmd.index("-d") + 1])
+        assert not extract_dir.exists()
+        return RunResult(
+            command=" ".join(cmd),
+            returncode=0,
+            stdout="",
+            stderr="reported success but wrote nothing",
+            status="success",
+        )
+
+    monkeypatch.setattr("tools.firmware.collect_info.shutil.which", fake_which)
+    monkeypatch.setattr("tools.firmware.unpack.shutil.which", fake_which)
+    monkeypatch.setattr(
+        "tools.firmware.collect_info._binwalk_signatures",
+        lambda path: [{"offset": 0, "offset_hex": "0x0", "description": "custom header"}],
+    )
+    monkeypatch.setattr("tools.firmware.unpack.run_command", fake_run_command)
+
+    result = unpack(fw, out)
+    extraction = result["fallback"]["attempts"][0]["extraction"]["attempts"][0]
+    assert extraction["attempts"][0]["status"] == "failed"
+
+
+def test_unpack_records_encrypted_openssl_payload(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Encrypted OpenSSL-style payloads are recorded without noisy gzip carving."""
+    fw = tmp_path / "encrypted.bin"
+    fw.write_bytes(b"H" * 16 + b"Salted__12345678" + b"\x1f\x8b" + b"ciphertext")
+    out = tmp_path / "out"
+
+    monkeypatch.setattr("tools.firmware.collect_info.shutil.which", lambda name: "/bin/binwalk")
+    monkeypatch.setattr("tools.firmware.unpack.shutil.which", lambda name: None)
+    monkeypatch.setattr(
+        "tools.firmware.collect_info._binwalk_signatures",
+        lambda path: [
+            {
+                "offset": 16,
+                "offset_hex": "0x10",
+                "description": "OpenSSL encryption, salted, salt: 0x3132333435363738",
+            }
+        ],
+    )
+
+    result = unpack(fw, out)
+
+    assert result["encrypted"]["status"] == "degraded"
+    assert result["encrypted"]["attempts"][0]["format"] == "openssl-salted"
+    assert Path(result["encrypted"]["attempts"][0]["slice"]).read_bytes().startswith(b"Salted__")
+    assert result["fallback"]["attempts"] == []
 
 
 def test_arch_detect_no_elf(tmp_path: Path) -> None:

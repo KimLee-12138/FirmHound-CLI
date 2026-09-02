@@ -22,35 +22,78 @@ MARKERS: dict[str, int] = {
 }
 
 
+def _safe_exists(path: Path) -> bool:
+    """Return whether a path exists without following broken/inaccessible links."""
+    try:
+        return path.exists() or path.is_symlink()
+    except OSError:
+        try:
+            return path.is_symlink()
+        except OSError:
+            return False
+
+
+def _safe_is_dir(path: Path) -> bool:
+    """Directory check that tolerates firmware symlinks not resolvable on Windows."""
+    try:
+        return path.is_dir()
+    except OSError:
+        return False
+
+
+def _safe_any_child(path: Path) -> bool:
+    """Check whether a directory has children without letting bad links abort."""
+    try:
+        return _safe_is_dir(path) and any(path.iterdir())
+    except OSError:
+        return False
+
+
+def _first_existing(paths: list[Path]) -> Path | None:
+    for path in paths:
+        if _safe_exists(path):
+            return path
+    return None
+
+
 def _score_directory(path: Path) -> dict[str, Any]:
     """Return score details for a single candidate directory."""
     score = 0
     markers: list[str] = []
 
     checks = [
-        ("has_bin", path / "bin"),
-        ("has_sbin", path / "sbin"),
-        ("has_etc", path / "etc"),
-        ("has_lib", path / "lib"),
-        ("has_usr", path / "usr"),
-        ("has_busybox", path / "bin" / "busybox"),
-        ("has_initd", path / "etc" / "init.d"),
+        ("has_bin", [path / "bin"]),
+        ("has_sbin", [path / "sbin"]),
+        ("has_etc", [path / "etc", path / "etc_ro"]),
+        ("has_lib", [path / "lib"]),
+        ("has_usr", [path / "usr"]),
+        ("has_busybox", [path / "bin" / "busybox"]),
+        ("has_initd", [path / "etc" / "init.d", path / "etc_ro" / "init.d"]),
     ]
 
-    for marker, target in checks:
-        if target.exists():
-            if marker == "has_initd":
-                # init.d must be non-empty to count.
-                if target.is_dir() and any(target.iterdir()):
-                    score += MARKERS[marker]
-                    markers.append(marker)
-            else:
+    for marker, targets in checks:
+        target = _first_existing(targets)
+        if target is None:
+            continue
+        if marker == "has_initd":
+            # init.d must be non-empty to count.
+            if _safe_any_child(target):
                 score += MARKERS[marker]
                 markers.append(marker)
+        else:
+            score += MARKERS[marker]
+            markers.append(marker)
 
     # Web root markers
-    web_dirs = [path / "www", path / "htdocs", path / "web", path / "usr" / "www"]
-    if any(d.is_dir() for d in web_dirs):
+    web_dirs = [
+        path / "www",
+        path / "htdocs",
+        path / "web",
+        path / "usr" / "www",
+        path / "webroot",
+        path / "webroot_ro",
+    ]
+    if any(_safe_is_dir(d) for d in web_dirs):
         score += MARKERS["has_web"]
         markers.append("has_web")
 
@@ -62,7 +105,7 @@ def _score_directory(path: Path) -> dict[str, Any]:
         path / "usr" / "sbin" / "goahead",
         path / "bin" / "goahead",
     ]
-    if any(b.exists() for b in httpd_bins):
+    if any(_safe_exists(b) for b in httpd_bins):
         score += MARKERS["has_httpd"]
         markers.append("has_httpd")
 
@@ -93,11 +136,14 @@ def score_rootfs_candidates(extracted_dir: str | Path) -> dict[str, Any]:
             continue
         # Treat the root itself as a candidate if it has typical top-level dirs.
         has_top_level = any(
-            (root / name).is_dir() for name in ("bin", "sbin", "etc", "lib", "usr")
+            _safe_is_dir(root / name) for name in ("bin", "sbin", "etc", "etc_ro", "lib", "usr")
         )
         if has_top_level and root not in [Path(c["path"]) for c in candidates]:
             candidates.append(_score_directory(root))
-        if any((child / name).is_dir() for name in ("bin", "sbin", "etc", "lib", "usr")):
+        if any(
+            _safe_is_dir(child / name)
+            for name in ("bin", "sbin", "etc", "etc_ro", "lib", "usr")
+        ):
             candidates.append(_score_directory(child))
 
     # Deduplicate by path.
