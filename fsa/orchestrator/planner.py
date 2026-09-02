@@ -35,6 +35,7 @@ class Planner:
         "UNPACK",
         "SURFACE",
         "BINARY_TRIAGE",
+        "STATIC_ANALYSIS",
         "RANK",
         "VERIFY_TOP_K",
         "REPORT",
@@ -109,6 +110,8 @@ class Planner:
             "requires_human_gate": False,
             "human_gate_reasons": [],
         }
+        if input_data.get("rootfs_path"):
+            task_card["rootfs_path"] = input_data["rootfs_path"]
 
         # If natural_language is provided, extract slots heuristically.
         nl = input_data.get("natural_language", "")
@@ -223,34 +226,63 @@ class Planner:
         else:  # "standard" and anything else -> main track only, no external stages
             stages = list(self.DEFAULT_STAGES)
 
+        config_path = self.config.get("_config_path")
+        external_args = {"config_path": config_path} if config_path else {}
+
         plan: dict[str, Any] = {
             "stages": stages,
             "stage_configs": {
-                "UNPACK": {"tool": "tools.firmware.unpack", "required": True},
+                "UNPACK": {
+                    "tool": "tools.firmware.unpack",
+                    "required": True,
+                    "args": {
+                        "temp_root": self.config.get("paths", {}).get("temp", ""),
+                        "safety_config": self.config.get("safety", {}).get("config", ""),
+                    },
+                },
                 "SURFACE": {"tool": "tools.web.build_attack_surface", "required": True},
-                "BINARY_TRIAGE": {"tool": "tools.binary.triage", "required": True},
+                "BINARY_TRIAGE": {
+                    "tool": "tools.binary.triage",
+                    "required": True,
+                    "args": {
+                        "max_binaries": self.config.get("analysis", {}).get("max_binaries", 500),
+                        "max_strings_per_binary": self.config.get("analysis", {}).get(
+                            "max_strings_per_binary", 200
+                        ),
+                    },
+                },
                 "DECOMPILE": {"tool": "tools.binary.decompile", "required": False},
                 "STATIC_ANALYSIS": {"tool": "tools.audit.static", "required": True},
                 # External track (all required=False).
                 "EXTERNAL_ANALYSIS": {
                     "tool": "tools.external.run_all",
                     "required": False,
-                    "args": {"phase": "upstream"},
+                    "args": {
+                        "phase": "upstream",
+                        **external_args,
+                    },
                 },
                 "FUSION": {
                     "tool": "tools.analysis.finding_fusion",
                     "required": False,
+                    "args": external_args,
                 },
                 "SYMEX_PRUNE": {
                     "tool": "tools.external.klee.prune",
                     "required": False,
+                    "args": external_args,
                 },
                 "CONSTRAINED_VALIDATION": {
                     "tool": "tools.external.bond.validate",
                     "required": False,
+                    "args": external_args,
                 },
                 "RANK": {"tool": "tools.audit.rank", "required": True},
-                "VERIFY_TOP_K": {"tool": "tools.audit.verify", "required": True},
+                "VERIFY_TOP_K": {
+                    "tool": "tools.audit.verify",
+                    "required": True,
+                    "args": {"top_k": self.config.get("analysis", {}).get("verify_top_k", 5)},
+                },
                 "LOCAL_VALIDATION": {"tool": "tools.emu.validate", "required": False},
                 "REPORT": {"tool": "tools.report.generate", "required": True},
             },

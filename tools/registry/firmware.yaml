@@ -11,17 +11,19 @@ tools:
       required: [firmware_path]
 
   - name: tools.firmware.unpack
-    module_path: tools.firmware.unpack
-    function_name: unpack_firmware
-    description: Extract firmware into candidate rootfs directories.
+    module_path: tools.firmware.pipeline
+    function_name: execute_unpack
+    description: Select a submitted rootfs or extract a submitted firmware image.
     args_schema:
       type: object
       properties:
-        firmware_path:
+        run_dir:
           type: string
-        output_dir:
+        temp_root:
           type: string
-      required: [firmware_path]
+        safety_config:
+          type: string
+      required: [run_dir, temp_root, safety_config]
 
   - name: tools.firmware.rootfs_score
     module_path: tools.firmware.rootfs_score

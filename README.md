@@ -64,24 +64,26 @@
 | 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
-| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 20 节骨架 + 7 项合规扫描 + 脱敏 |
-| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，189 个单元测试持续守护 |
+| 📜 证据链可审计 | EvidenceStore / DecisionStore 全量落盘，报告 21 节骨架，静态结论保留反证与限制 |
+| ✅ 金标准回归 | `benchmarks/CVEs/` 9 个历史 CVE fixture，300+ 项测试持续守护 |
 
 ## 快速开始（60 秒）
 
 ```bash
-# ① 环境自检
-python scripts/dev.py test        # 预期 189 passed
-python scripts/dev.py lint        # 预期 All checks passed
+# ① 安装 CLI 并自检
+python -m pip install -e .
+python scripts/dev.py test
 
-# ② 金标准回归（9 个历史 CVE → 评分 → 反证 → 报告）
-python scripts/run_pipeline.py --out-dir runs/pipeline --top-k 5
+# ② 分析已解包 rootfs（授权主体为必填项）
+fsa analyze tmp/unpacked/squashfs-root --input-type rootfs \
+  --authorization-holder "设备所有者" --depth standard --run-id hunt1
 
-# ③ 未知固件演练（零 CVE 先验，检出 4 个植入漏洞）
-python scripts/run_e2e.py
+# ③ 或直接提交固件镜像（需要已配置可用的解包工具）
+fsa analyze firmware_samples/router.bin --input-type firmware \
+  --authorization-holder "设备所有者" --depth full
 ```
 
-> ⚠️ 以上命令在 Windows 或 Linux 下均可运行；第 ③ 步如不传 `--rootfs` 会自动用内置仿真固件演示。**真实固件需要先解包**，见下文 [拿到固件后怎么做](#拿到固件后怎么做完整流程)。
+> ⚠️ CLI 只接受 `config/safety.yaml` 白名单内的输入路径。Windows/Linux 都可分析 rootfs；直接解包真实固件仍建议准备 WSL/Linux 解包工具链。
 
 ## 系统架构
 
@@ -309,19 +311,19 @@ sasquatch -d tmp/squashfs-root firmware_samples/DIR859_FW102b03.bin
 **Windows 或 Linux 均可**（纯 Python，无需 WSL）：
 
 ```bash
-python scripts/run_e2e.py --rootfs <rootfs路径> --out-dir runs/<本次任务名>
+fsa analyze <rootfs路径> --input-type rootfs --authorization-holder "设备所有者" --run-id <本次任务名>
 ```
 
 **Windows 示例**：
 
 ```powershell
-python scripts/run_e2e.py --rootfs "C:\Users\22067\Desktop\揭榜挂帅——网络安全\tmp\unpacked\_DIR859_FW102b03.bin-0.extracted\squashfs-root" --out-dir runs\dir859_run1
+fsa analyze "C:\Users\22067\Desktop\揭榜挂帅——网络安全\tmp\unpacked\_DIR859_FW102b03.bin-0.extracted\squashfs-root" --input-type rootfs --authorization-holder "设备所有者" --run-id dir859_run1
 ```
 
 **Linux 示例**：
 
 ```bash
-python scripts/run_e2e.py --rootfs "tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root" --out-dir runs/dir859_run1
+fsa analyze "tmp/unpacked/_DIR859_FW102b03.bin-0.extracted/squashfs-root" --input-type rootfs --authorization-holder "设备所有者" --run-id dir859_run1
 ```
 
 运行结束会打印报告，并保存到 `runs/dir859_run1/report.md`。
@@ -396,15 +398,17 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 
 | 命令 | 用途 | 产物 |
 |---|---|---|
+| `fsa analyze <固件或rootfs> --authorization-holder <授权主体>` | **正式分析入口**；自动识别文件/目录 | `runs/<run-id>/` 全量证据、状态、报告 |
+| `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
+| `fsa resume <run-id>` | 从第一个未完成阶段恢复 | 更新原运行目录 |
 | `python scripts/dev.py test` | 跑全部单元测试 | — |
 | `python scripts/dev.py test-all` | 单元测试 + 主机相关集成测试 | — |
 | `python scripts/dev.py ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
 | `python scripts/dev.py lint` | ruff 代码检查 | — |
 | `python scripts/dev.py format` | 自动格式化 | — |
-| `python scripts/run_pipeline.py --out-dir runs/pipeline --top-k 5` | 金标准回归（9 个 CVE） | `ranking.json` / `verdicts.json` / `report.md` |
-| `python scripts/run_pipeline.py --depth full --out-dir runs/ext_full` | 双轨完整链；默认 Blind Run 且四器全关 | 外部 findings / unified candidates / 报告第 21 节 |
-| `python scripts/run_e2e.py --rootfs <rootfs> --out-dir runs/xxx` | **真实固件分析（核心）** | `analysis.json` / `report.md` |
-| `python scripts/demo_rank.py --out-dir runs/demo` | 评分排序演示 | `ranking.json` / `ranking.md` |
+| `python scripts/run_pipeline.py ...` | 旧金标准回归脚本（测试用途，不是产品 CLI） | fixture 回归产物 |
+| `python scripts/run_e2e.py ...` | 旧合成样本演练（测试用途，不代表真实主链） | 演练产物 |
+| `python scripts/demo_rank.py ...` | 独立评分示例（测试用途） | 示例排序产物 |
 | `bash scripts/setup_wsl.sh`（WSL 内） | 一键装 Linux 工具链 | — |
 
 ## 配置说明
@@ -442,7 +446,7 @@ export OPENAI_API_KEY=sk-xxx    # Windows PowerShell: $env:OPENAI_API_KEY="sk-xx
 ├── schemas/                # JSON Schema + examples（含 external_finding）
 ├── config/                 # dev.yaml / models.yaml / safety.yaml
 ├── benchmarks/CVEs/        # 9 个历史 CVE 金标准 fixture
-├── scripts/                # CLI 入口（dev / run_pipeline / run_e2e / demo_rank / setup_wsl）
+├── scripts/                # 开发、回归与环境辅助脚本（正式 CLI 位于 fsa/cli.py）
 ├── firmware_samples/       # ← 固件放置目录
 ├── tmp/                    # 解包产物
 ├── runs/                   # 分析报告与 JSON 产物

@@ -1,11 +1,11 @@
 tools:
   - name: tools.web.build_attack_surface
-    module_path: tools.web.build_attack_surface
-    function_name: build_attack_surface
+    module_path: tools.web.pipeline
+    function_name: execute_surface
     description: Build attack surface from rootfs inventory and webroot.
     args_schema:
       type: object
       properties:
-        rootfs_dir:
+        run_dir:
           type: string
-      required: [rootfs_dir]
+      required: [run_dir]

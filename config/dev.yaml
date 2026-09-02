@@ -11,6 +11,12 @@ paths:
   runs: ./runs
   temp: ./tmp
   schemas: ./schemas
+  models: ./config/models.yaml
+
+analysis:
+  max_binaries: 500
+  max_strings_per_binary: 200
+  verify_top_k: 5
 
 safety:
   config: config/safety.yaml

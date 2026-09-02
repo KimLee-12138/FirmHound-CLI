@@ -1,0 +1,73 @@
+tools:
+  - name: tools.binary.triage
+    module_path: tools.binary.pipeline
+    function_name: execute_triage
+    description: Inventory and summarize ELF binaries from the selected rootfs.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+        max_binaries: {type: integer}
+        max_strings_per_binary: {type: integer}
+      required: [run_dir]
+
+  - name: tools.binary.decompile
+    module_path: tools.binary.pipeline
+    function_name: execute_decompile
+    description: Record configured decompiler output or an honest static fallback.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+      required: [run_dir]
+
+  - name: tools.audit.static
+    module_path: tools.audit.static
+    function_name: execute_static
+    description: Generate evidence-backed source/sink candidates.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+      required: [run_dir]
+
+  - name: tools.audit.rank
+    module_path: tools.audit.rank
+    function_name: execute_rank
+    description: Rank candidates using the ten-dimension risk model.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+      required: [run_dir]
+
+  - name: tools.audit.verify
+    module_path: tools.audit.verify
+    function_name: execute_verify
+    description: Falsification-first review of the highest-ranked candidates.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+        top_k: {type: integer}
+      required: [run_dir]
+
+  - name: tools.emu.validate
+    module_path: tools.emulation.validate
+    function_name: execute_validation
+    description: Run the harmless QEMU L1 load check when available.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+      required: [run_dir]
+
+  - name: tools.report.generate
+    module_path: tools.report.generate
+    function_name: execute_report
+    description: Generate the competition report and final verdict artifact.
+    args_schema:
+      type: object
+      properties:
+        run_dir: {type: string}
+      required: [run_dir]

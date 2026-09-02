@@ -159,7 +159,7 @@ wsl -d Ubuntu-22.04 -- bash -lc "ls /mnt/c/Users/22067/Desktop/揭榜挂帅—�
 解包出 rootfs 后，回到 **Windows cmd**，执行：
 
 ```bat
-C:\Users\22067\.workbuddy\binaries\python\envs\default\Scripts\python.exe scripts\run_e2e.py --rootfs C:\Users\22067\Desktop\揭榜挂帅——网络安全\tmp\unpacked\<你找到的rootfs目录> --out-dir runs\hunt1
+C:\Users\22067\.workbuddy\binaries\python\envs\default\Scripts\python.exe -m fsa.cli analyze C:\Users\22067\Desktop\揭榜挂帅——网络安全\tmp\unpacked\<你找到的rootfs目录> --input-type rootfs --authorization-holder "设备所有者" --run-id hunt1
 ```
 
 > 把 `<你找到的rootfs目录>` 换成第 4 步找到的路径，例如 `tmp\unpacked\_DIR-859_Ax_FW_113b03.bin.extracted\squashfs-root`。
@@ -271,7 +271,7 @@ wsl -d Ubuntu-22.04 -- bash -lc "cd /mnt/c/Users/22067/Desktop/揭榜挂帅—�
 :: ③ 找 rootfs：ls tmp\unpacked 找 squashfs-root
 
 :: ④ Windows 跑分析
-C:\Users\22067\.workbuddy\binaries\python\envs\default\Scripts\python.exe scripts\run_e2e.py --rootfs <rootfs路径> --out-dir runs\hunt1
+C:\Users\22067\.workbuddy\binaries\python\envs\default\Scripts\python.exe -m fsa.cli analyze <rootfs路径> --input-type rootfs --authorization-holder "设备所有者" --run-id hunt1
 
 :: ⑤ 看报告
 ::    直接打开 runs\hunt1\report.md，或拖给 WorkBuddy 渲染

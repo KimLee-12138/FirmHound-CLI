@@ -30,14 +30,18 @@ class ToolSpec:
 class ToolRegistry:
     """Discover and call tools from YAML declarations."""
 
-    def __init__(self, registry_dir: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        registry_dir: str | Path | None = None,
+        policy_engine: PolicyEngine | None = None,
+    ) -> None:
         self.registry_dir = (
             Path(registry_dir)
             if registry_dir
             else Path(__file__).parent.parent.parent / "tools" / "registry"
         )
         self._tools: dict[str, ToolSpec] = {}
-        self._policy = PolicyEngine.from_yaml()
+        self._policy = policy_engine or PolicyEngine.from_yaml()
         self._load_registry()
 
     def _load_registry(self) -> None:
@@ -79,12 +83,13 @@ class ToolRegistry:
         # Safety gate for commands.
         if "command" in args:
             cmd = str(args["command"])
-            policy_result = self._policy.evaluate_command(cmd)
-            if not policy_result["allowed"]:
+            try:
+                self._policy.check_command(cmd)
+            except Exception as exc:  # noqa: BLE001
                 return ToolResult(
                     status="unsafe",
                     output={},
-                    stderr=f"Policy rejected command: {policy_result['reason']}",
+                    stderr=f"Policy rejected command: {exc}",
                 )
 
         start = time.time()
