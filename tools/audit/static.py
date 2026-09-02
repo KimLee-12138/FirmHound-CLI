@@ -31,16 +31,44 @@ def _class_for_sink(sink: dict[str, Any]) -> str:
 
 
 def _matching_surface(summary: dict[str, Any], surfaces: list[dict[str, Any]]) -> dict[str, Any]:
-    binary_name = Path(summary["path"]).name
-    return next(
-        (
-            surface
-            for surface in surfaces
-            if Path(str(surface.get("binary") or "")).name == binary_name
-            or surface.get("handler") == binary_name
-        ),
-        {},
+    """Attach the attack surface that *actually* belongs to this binary.
+
+    Old behaviour matched on bare basename (``Path(surface.binary).name ==
+    Path(summary.path).name``), which made candidates inherit a *different*
+    binary's surface whenever two files shared a name -- and, worse, attached
+    bogus ``/goform/format`` noise surfaces. New rules:
+
+    1. exact rootfs-relative path equality between ``surface.binary`` and the
+       binary summary path (covers CGI surfaces and ``daemon`` surfaces);
+    2. among exact matches, prefer one whose handler token appears in the
+       binary's own string sample (best-effort handler attribution);
+    3. then prefer ``preauth`` (unauthenticated) surfaces -- worst case is the
+       honest assumption for a blind run.
+    """
+    binary_path = summary.get("path", "")
+    string_sample = " ".join(
+        str(sample)
+        for sample in (summary.get("strings_summary") or {}).get("sample", [])
     )
+    exact = [
+        surface
+        for surface in surfaces
+        if surface.get("binary") == binary_path
+        or (
+            surface.get("category") == "daemon"
+            and surface.get("handler") == Path(binary_path).name
+        )
+    ]
+    if not exact:
+        return {}
+    for surface in exact:
+        handler = str(surface.get("handler") or "")
+        if handler and handler in string_sample:
+            return surface
+    for surface in exact:
+        if surface.get("auth_hint") == "preauth":
+            return surface
+    return exact[0]
 
 
 def execute_static(run_dir: str) -> dict[str, Any]:
@@ -55,6 +83,13 @@ def execute_static(run_dir: str) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
 
     for summary in binary_payload.get("summaries", []):
+        summary_path = str(summary.get("path", ""))
+        # Kernel modules (.ko) and shared libraries (.so) are not user-space
+        # entry points: they have no reachable network surface and only pollute
+        # the candidate set (e.g. a .ko exporting _raw_write_lock_bh must never
+        # rank above a web daemon's command-injection sink).
+        if summary_path.endswith(".ko") or ".so" in summary_path:
+            continue
         matched = match_binary(summary)
         if not matched["sources"] or not matched["sinks"]:
             continue
@@ -74,6 +109,12 @@ def execute_static(run_dir: str) -> dict[str, Any]:
                 matched["sources"][0],
             )
             source_signal = source.get("api") or source.get("string")
+            # Blind-run precision gate: a candidate needs either a mapped attack
+            # surface or a network-borne source. Sinks reached only from internal
+            # env/config sources with no entry point are noise; skipping them
+            # keeps candidates.json focused on reachable attack surface.
+            if not surface and source.get("type") not in network_types:
+                continue
             candidate_id = _candidate_id(summary["binary_id"], source["type"], sink["function"])
             evidence = evidence_store.add(
                 run_id=run.name,

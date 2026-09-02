@@ -35,6 +35,15 @@ def _extract_strings(path: Path, min_len: int = 5) -> list[str]:
 
 # GoAhead form handlers: formXxx / fromXxx naming convention (case-insensitive head).
 GOAHEAD_RE = re.compile(r"\b(form|from)([A-Za-z0-9_]{2,})\b")
+# A real GoAhead/CGI daemon embeds the literal dispatch prefix "/goform/".
+# Requiring it kills the classic false positive where every ELF that contains a
+# common English word starting with "form" (e.g. "format") is reported as a
+# /goform/ handler (libc, busybox, fs tools, kernel modules, ...).
+GOAHEAD_DISPATCH_RE = re.compile(r"/goform/")
+# Handler tokens are camelCase (formexeCommand) or snake_case (form_fast_setting).
+# All-lowercase English words ("format", "formats", "formatted", "former",
+# "forms", "forward", "fromhead", ...) are dispatcher noise, not handlers.
+GOAHEAD_HANDLER_QUALITY_RE = re.compile(r"[A-Z_]")
 # Generic CGI references.
 CGI_RE = re.compile(r"([A-Za-z0-9_/-]+\.cgi)")
 # URL route strings starting with / and looking like paths.
@@ -59,20 +68,27 @@ def extract_handlers(binary_path: str | Path) -> dict[str, Any]:
 
     goahead_forms: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for match in GOAHEAD_RE.finditer(text):
-        full = match.group(0)
-        if full in seen:
-            continue
-        seen.add(full)
-        route = f"/goform/{full}"
-        goahead_forms.append(
-            {
-                "handler": full,
-                "route": route,
-                "category": "goahead_form",
-                "evidence": full,
-            }
-        )
+    # Only files that embed the actual "/goform/" dispatch prefix (or register
+    # handlers via websFormDefine) can serve GoAhead forms. Every other ELF --
+    # libc, busybox, filesystem tools -- yields zero CGI surfaces.
+    if GOAHEAD_DISPATCH_RE.search(text) or GOAHEAD_REGISTER.search(text):
+        for match in GOAHEAD_RE.finditer(text):
+            full = match.group(0)
+            if full in seen:
+                continue
+            if not GOAHEAD_HANDLER_QUALITY_RE.search(full):
+                # "format"/"formats"/"fromusb"... are English words, not handlers.
+                continue
+            seen.add(full)
+            route = f"/goform/{full}"
+            goahead_forms.append(
+                {
+                    "handler": full,
+                    "route": route,
+                    "category": "goahead_form",
+                    "evidence": full,
+                }
+            )
 
     cgi_hits: list[dict[str, Any]] = []
     seen_cgi: set[str] = set()
