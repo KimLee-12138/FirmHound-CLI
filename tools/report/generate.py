@@ -28,6 +28,7 @@ _SECTIONS = [
     "漏洞候选总览",
     "风险排序",
     "反证验证结果",
+    "误报控制摘要",
     "本地动态验证",
     "外部分析器结果",
     "证据链与可追溯性",
@@ -39,6 +40,50 @@ _SECTIONS = [
 
 def _count(payload: Any, key: str) -> int:
     return len(payload.get(key, [])) if isinstance(payload, dict) else 0
+
+
+def _false_positive_summary(
+    ranking: dict[str, Any],
+    verdict: dict[str, Any],
+) -> dict[str, Any]:
+    """Summarize how many candidates were constrained, downgraded, or left for validation."""
+    ranked = ranking.get("candidates", []) if isinstance(ranking, dict) else []
+    verdicts = verdict.get("verdicts", []) if isinstance(verdict, dict) else []
+    actions = [str(v.get("action", "")).upper() for v in verdicts if isinstance(v, dict)]
+    support_count = sum(len(c.get("evidence", []) or []) for c in ranked if isinstance(c, dict))
+    counter_count = sum(
+        len(c.get("counterevidence", []) or []) for c in ranked if isinstance(c, dict)
+    )
+    need_dynamic = sum(
+        1
+        for c in ranked
+        if isinstance(c, dict)
+        and (
+            c.get("decisive_missing_fact")
+            or c.get("conclusion_category") in {"unknown", "high-confidence-candidate"}
+        )
+    )
+    confirmed = sum(
+        1
+        for c in ranked
+        if isinstance(c, dict) and c.get("conclusion_category") == "confirmed-issue"
+    )
+    completeness = 0.0
+    if ranked:
+        evidence_ready = sum(1 for c in ranked if isinstance(c, dict) and c.get("evidence"))
+        completeness = round(evidence_ready / len(ranked), 3)
+    return {
+        "candidate_total": len(ranked),
+        "reviewed_total": len(verdicts),
+        "accepted_total": actions.count("ACCEPT"),
+        "downgraded_total": actions.count("DOWNGRADE"),
+        "rejected_total": actions.count("REJECT"),
+        "need_dynamic_total": actions.count("NEED_DYNAMIC") or need_dynamic,
+        "confirmed_total": confirmed,
+        "supporting_evidence_total": support_count,
+        "counterevidence_total": counter_count,
+        "evidence_completeness": completeness,
+    }
 
 
 def _section_body(
@@ -56,6 +101,7 @@ def _section_body(
     rows = binaries.get("summaries", []) if isinstance(binaries, dict) else []
     ranked = ranking.get("candidates", []) if isinstance(ranking, dict) else []
     verdicts = verdict.get("verdicts", []) if isinstance(verdict, dict) else []
+    fp_summary = _false_positive_summary(ranking, verdict)
     values = {
         "执行摘要": f"完成 {_count(surfaces, 'surfaces')} 个攻击面、{len(rows)} 个 ELF 与 {len(ranked)} 个候选的可追溯分析。",
         "任务与授权范围": f"授权主体：{task['authorization']['holder']}；范围：{task['authorization']['scope']}；仅分析提交的输入。",
@@ -76,6 +122,14 @@ def _section_body(
         )
         or "无候选。",
         "反证验证结果": f"已复核：{len(verdicts)}；接受：{sum(1 for v in verdicts if v.get('action') == 'ACCEPT')}。",
+        "误报控制摘要": (
+            f"候选总数：{fp_summary['candidate_total']}；已复核：{fp_summary['reviewed_total']}；"
+            f"确认采纳：{fp_summary['accepted_total']}；降级：{fp_summary['downgraded_total']}；"
+            f"拒绝：{fp_summary['rejected_total']}；需动态验证：{fp_summary['need_dynamic_total']}；"
+            f"支持证据：{fp_summary['supporting_evidence_total']}；"
+            f"反证：{fp_summary['counterevidence_total']}；"
+            f"证据完整度：{fp_summary['evidence_completeness']}。"
+        ),
         "本地动态验证": f"状态：{validation.get('status', '未执行') if isinstance(validation, dict) else '未执行'}；不将加载测试表述为漏洞复现。",
         "外部分析器结果": (
             f"规范化外部发现：{len(external.get('findings', []))}；"
@@ -150,6 +204,7 @@ def execute_report(run_dir: str) -> dict[str, Any]:
             "attack_surfaces": _count(surfaces, "surfaces"),
             "binaries": _count(binaries, "summaries"),
             "candidates": _count(ranking, "candidates"),
+            "false_positive_control": _false_positive_summary(ranking, verdict),
         },
         "report": str(report_path),
     }

@@ -108,8 +108,11 @@ def test_cli_analyze_rootfs_reaches_done(depth: str) -> None:
         assert load_json(run / "artifacts" / "binary_summaries.json")["summaries"]
         assert load_json(run / "artifacts" / "candidates.json")["candidates"]
         assert load_json(run / "artifacts" / "verdict.json")["verdicts"]
-        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 21
+        assert (run / "report.md").read_text(encoding="utf-8").count("\n## ") == 22
+        assert "误报控制摘要" in (run / "report.md").read_text(encoding="utf-8")
         assert (run / "final_verdict.json").is_file()
+        stats = load_json(run / "final_verdict.json")["stats"]
+        assert "false_positive_control" in stats
         assert load_json(run / "artifacts" / "report_compliance.json")["status"] == "ok"
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
@@ -208,5 +211,72 @@ def test_cli_doctor_reports_readiness() -> None:
         assert payload["status"] in {"ok", "degraded"}
         assert payload["checks"]["schemas"]["status"] == "ok"
         assert payload["checks"]["paths"]["status"] == "ok"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_unpack_diagnose_reports_encrypted_firmware() -> None:
+    workspace = (Path("tmp") / f"cli-diagnose-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        firmware = workspace / "rootfs" / "encrypted.bin"
+        firmware.parent.mkdir(parents=True, exist_ok=True)
+        firmware.write_bytes(b"HEAD" + b"Salted__" + b"0" * 64)
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "unpack-diagnose",
+                str(firmware),
+                "--json-output",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["status"] == "blocked_needs_decryption"
+        assert payload["magic_hits"]
+        assert any("加密" in item or "OpenSSL" in item for item in payload["recommendations"])
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_cli_explain_renders_candidate_ledger() -> None:
+    workspace = (Path("tmp") / f"cli-explain-test-{uuid.uuid4().hex}").resolve()
+    workspace.mkdir(parents=True)
+    try:
+        config = _test_config(workspace)
+        rootfs = _rootfs(workspace)
+        run_result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "analyze",
+                str(rootfs),
+                "--depth",
+                "standard",
+                "--authorization-holder",
+                "fixture-owner",
+                "--run-id",
+                "cli-explain",
+            ],
+        )
+        assert run_result.exit_code == 0, run_result.output
+        result = CliRunner().invoke(
+            main,
+            [
+                "--config",
+                str(config),
+                "explain",
+                "cli-explain",
+                "--format",
+                "markdown",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "漏洞证据账本" in result.output
+        assert "十维评分" in result.output
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

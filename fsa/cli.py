@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 from fsa.orchestrator.engine import Orchestrator, validate_run_id
 from fsa.schemas.loader import validate_all_examples
 from fsa.utils.jsonio import load_json, load_yaml
+from tools.firmware.diagnose import diagnose_firmware
+from tools.report.explain import build_evidence_ledger, render_ledger_markdown
 
 
 def _emit(value: dict[str, Any], as_json: bool) -> None:
@@ -350,6 +352,35 @@ def doctor(ctx: click.Context, include_external_probes: bool, json_output: bool)
     _emit({"status": _status_from_checks(checks), "checks": checks}, json_output)
 
 
+@main.command(name="unpack-diagnose")
+@click.argument("firmware_path", type=click.Path(path_type=Path, exists=True, dir_okay=False))
+@click.option("--json-output", is_flag=True, help="Emit machine-readable diagnosis.")
+@click.pass_context
+def unpack_diagnose(ctx: click.Context, firmware_path: Path, json_output: bool) -> None:
+    """Diagnose whether and how a firmware image can be unpacked."""
+    try:
+        source = firmware_path.resolve()
+        orchestrator = Orchestrator(config_path=ctx.obj["config"])
+        orchestrator.policy.check_path(source)
+        diagnosis = diagnose_firmware(source)
+    except Exception as exc:  # noqa: BLE001
+        structlog.get_logger().error("unpack_diagnose_failed", error=str(exc))
+        raise click.ClickException(str(exc)) from exc
+
+    if json_output:
+        _emit(diagnosis, True)
+        return
+    click.echo(f"status: {diagnosis['status']}")
+    click.echo(f"firmware: {diagnosis['firmware']}")
+    click.echo(f"sha256: {diagnosis['sha256']}")
+    click.echo(f"signature_count: {diagnosis['signature_count']}")
+    click.echo(f"selected_strategy: {diagnosis['selected_strategy']}")
+    click.echo(f"confidence: {diagnosis['confidence']}")
+    click.echo("recommendations:")
+    for item in diagnosis["recommendations"]:
+        click.echo(f"- {item}")
+
+
 @main.command(name="status")
 @click.argument("run_id")
 @click.option("--json-output", is_flag=True)
@@ -377,6 +408,73 @@ def show_status(ctx: click.Context, run_id: str, json_output: bool) -> None:
         },
         json_output,
     )
+
+
+@main.command()
+@click.argument("run_id")
+@click.option("--candidate-id", help="Explain only one candidate.")
+@click.option(
+    "--limit",
+    type=int,
+    default=5,
+    show_default=True,
+    help="Maximum candidates to include when --candidate-id is omitted; use 0 for all.",
+)
+@click.option(
+    "--output",
+    "output_path",
+    type=click.Path(path_type=Path, dir_okay=False),
+    help="Optional path to save the ledger JSON or Markdown.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "markdown"]),
+    default="json",
+    show_default=True,
+)
+@click.option("--json-output", is_flag=True, help="Emit machine-readable ledger.")
+@click.pass_context
+def explain(
+    ctx: click.Context,
+    run_id: str,
+    candidate_id: str | None,
+    limit: int,
+    output_path: Path | None,
+    output_format: str,
+    json_output: bool,
+) -> None:
+    """Render a vulnerability evidence ledger for a run or candidate."""
+    try:
+        validate_run_id(run_id)
+        orchestrator = Orchestrator(config_path=ctx.obj["config"])
+        run_dir = Path(orchestrator.config["paths"]["runs"]) / run_id
+        orchestrator.policy.check_path(run_dir)
+        if output_path is not None:
+            output_path = output_path.resolve()
+            orchestrator.policy.check_path(output_path.parent)
+        ledger = build_evidence_ledger(
+            run_dir,
+            candidate_id=candidate_id,
+            limit=None if limit == 0 else limit,
+        )
+    except Exception as exc:  # noqa: BLE001
+        structlog.get_logger().error("explain_failed", error=str(exc))
+        raise click.ClickException(str(exc)) from exc
+
+    if output_format == "markdown":
+        rendered = render_ledger_markdown(ledger)
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(rendered, encoding="utf-8")
+        click.echo(rendered)
+        return
+
+    if output_path:
+        from fsa.utils.jsonio import save_json
+
+        save_json(output_path, ledger)
+    _emit(ledger, True if json_output else True)
 
 
 @main.command()

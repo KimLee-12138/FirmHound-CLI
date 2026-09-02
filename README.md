@@ -402,6 +402,8 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `fsa doctor [--include-external-probes]` | 检查本机路径、Schema、运行时、外部工具可用性 | readiness 状态，缺外部工具时降级说明 |
 | `fsa plan --task <自然语言任务> [--task-package task.zip]` | 只解析任务并展示执行计划，不运行分析 | task_card 摘要与阶段列表 |
 | `fsa analyze <固件或rootfs> --authorization-holder <授权主体>` | **正式分析入口**；自动识别文件/目录 | `runs/<run-id>/` 全量证据、状态、报告 |
+| `fsa unpack-diagnose <firmware>` | 诊断固件是否可解包、卡在哪一层、需要什么解密/提取材料 | 签名、魔数、提取器、建议下一步 |
+| `fsa explain <run-id> [--candidate-id <id>]` | 输出漏洞证据账本，解释候选从哪里来、为何可疑、有什么反证 | 候选 source/sink/call_chain/十维评分/下一步 |
 | `fsa status <run-id>` | 查看持久化阶段状态 | 当前阶段 / 成功与失败阶段 |
 | `fsa resume <run-id>` | 从第一个未完成阶段恢复 | 更新原运行目录 |
 | `python scripts/dev.py smoke` | 通过正式 `fsa analyze` 入口跑最小 rootfs 冒烟 | `runs/dev-smoke-*` |
