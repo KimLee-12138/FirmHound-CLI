@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
 from fsa.schemas.loader import validate
-from scripts.run_pipeline import load_benchmark, render_report, run_pipeline
+from scripts.run_pipeline import load_benchmark, main, render_report, run_pipeline
 
 
 @pytest.fixture()
@@ -76,3 +77,10 @@ def test_full_depth_degrades_and_writes_external_artifacts(
     assert result["external"]["status"] == "degraded"
     assert (run_dir / "artifacts" / "unified_candidates.json").exists()
     assert (run_dir / "artifacts" / "external_findings" / "fused.json").exists()
+
+
+def test_legacy_entrypoint_requires_benchmark_acknowledgement(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["run_pipeline.py"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2

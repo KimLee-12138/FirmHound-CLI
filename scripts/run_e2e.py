@@ -254,10 +254,19 @@ def render_report(result: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run end-to-end static analysis on a rootfs.")
+    parser = argparse.ArgumentParser(
+        description="Run the synthetic regression fixture; use `fsa analyze` for real inputs."
+    )
+    parser.add_argument(
+        "--fixture-mode",
+        action="store_true",
+        help="Acknowledge this is a synthetic regression harness, not the product CLI.",
+    )
     parser.add_argument("--rootfs", default="C:/temp/fw_demo/rootfs")
     parser.add_argument("--out-dir", default="runs/e2e")
     args = parser.parse_args()
+    if not args.fixture_mode:
+        parser.error("pass --fixture-mode for regression fixtures or use `fsa analyze`")
 
     result = analyze_rootfs(args.rootfs)
     out_dir = Path(args.out_dir)
@@ -266,8 +275,10 @@ def main() -> int:
     report = render_report(result)
     (out_dir / "report.md").write_text(report, encoding="utf-8")
 
-    print(report)
-    print(f"\nArtifacts written to {out_dir.resolve()}")
+    import sys
+
+    sys.stdout.write(report)
+    sys.stdout.write(f"\n\nArtifacts written to {out_dir.resolve()}\n")
     return 0
 
 

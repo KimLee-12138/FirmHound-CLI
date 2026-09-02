@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from fsa.runtime import load_runtime
+from fsa.runtime import OfflineRuleRuntime, load_runtime
 from fsa.runtime.base import Budget, ModelReply
 from fsa.runtime.mock import MockRuntime
 from fsa.runtime.openai_compatible import OpenAICompatibleRuntime
@@ -25,6 +25,11 @@ def test_load_mock_runtime(models_config: dict[str, Any]) -> None:
     assert isinstance(rt, MockRuntime)
 
 
+def test_load_offline_runtime(models_config: dict[str, Any]) -> None:
+    rt = load_runtime("offline", models_config)
+    assert isinstance(rt, OfflineRuleRuntime)
+
+
 def test_load_openai_runtime(models_config: dict[str, Any]) -> None:
     rt = load_runtime("openai_compatible", models_config)
     assert isinstance(rt, OpenAICompatibleRuntime)
@@ -36,14 +41,16 @@ def test_mock_ask_model() -> None:
     budget = Budget(max_total_tokens=1000, max_model_calls_per_stage=10)
     reply = rt.ask_model([{"role": "user", "content": "Please rank these candidates."}], budget)
     assert isinstance(reply, ModelReply)
-    assert "rank" in reply.content.lower()
-    assert reply.metadata.get("reviewer") == "mock"
+    assert "no conclusion" in reply.content.lower()
+    assert reply.metadata.get("reviewer") == "rule"
+    assert reply.metadata.get("inference_performed") is False
 
 
 def test_mock_ask_model_no_messages() -> None:
     rt = MockRuntime({})
     reply = rt.ask_model([], Budget())
     assert "No input" in reply.content
+    assert reply.metadata["status"] == "degraded"
 
 
 def test_mock_tool_safety() -> None:

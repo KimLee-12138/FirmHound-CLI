@@ -1,9 +1,8 @@
 """Priority-ordered seed generation for directed fuzzing (mini-BOND X2).
 
-Replaces BOND's patched-BooFuzz mutation core. We do NOT modify BooFuzz; instead we
-generate *seed request sequences* honouring the constraint priority and hand them to
-the stock BooFuzz session manager (H-BOND.md §4.3). The generated seeds are plain
-request strings -- never command primitives (those are produced by the emulator, not us).
+Replaces BOND's patched-BooFuzz mutation core. It generates bounded seed request
+sequences honouring constraint priority for the built-in HTTP transport. The generated
+seeds are plain request parameters, never transport or shell command lines.
 """
 
 from __future__ import annotations

@@ -108,8 +108,9 @@ def test_report_skill() -> None:
     assert any("合规扫描" in s for s in steps)
 
 
-def test_mock_runtime_run_skill() -> None:
+def test_offline_runtime_loads_skill_metadata_without_claiming_execution() -> None:
     runtime = MockRuntime({})
     result = runtime.run_skill("05-candidate-verifier", {})
-    assert result.status == "success"
+    assert result.status == "partial"
+    assert result.deliverables["mode"] == "offline_metadata_only"
     assert "workflow_steps" in result.deliverables

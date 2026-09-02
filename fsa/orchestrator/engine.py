@@ -114,7 +114,7 @@ class Orchestrator:
         if safety.get("config"):
             safety["config"] = resolve_config_path(safety["config"])
 
-        runtime_name = self.config.get("runtime", {}).get("default", "mock")
+        runtime_name = self.config.get("runtime", {}).get("default", "offline")
         self.runtime = runtime or load_runtime(runtime_name)
         self.policy = policy_engine or PolicyEngine.from_yaml(safety.get("config"))
         self.registry = tool_registry or ToolRegistry(policy_engine=self.policy)

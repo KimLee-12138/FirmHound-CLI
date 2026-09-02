@@ -36,6 +36,8 @@ def test_is_private_ip() -> None:
     assert is_private_ip("192.168.1.1") is True
     assert is_private_ip("10.0.0.5") is True
     assert is_private_ip("127.0.0.1") is True
+    assert is_private_ip("224.0.0.1") is False
+    assert is_private_ip("2001:4860:4860::8888") is False
     assert is_private_ip("8.8.8.8") is False
     assert is_private_ip("not-an-ip") is False
 

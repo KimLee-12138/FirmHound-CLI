@@ -12,10 +12,9 @@ analyzer is gated by two independent switches (see docs/external/F-FirmRec.md §
 
 The analyzer runs inside the ``xylearn/firmrec-base`` Docker image, which bundles
 Ghidra, Gradle, PostgreSQL and the FirmRec pipeline. Because PostgreSQL lives in a
-long-lived container (``make start`` brings it up), ``run()`` executes the pipeline
-through ``docker exec`` against a started container when one is detected, and falls
-back to a throwaway ``docker run`` otherwise (recording the PG caveat in
-``limitation``). On a host without the image (e.g. a CI box), ``probe()`` returns
+database service. This adapter starts a throwaway analysis container, so its configured
+image/environment must make PostgreSQL reachable to that container. On a host without
+the image (e.g. a CI box), ``probe()`` returns
 ``available=False`` and the whole stage degrades to ``skipped`` -- never aborting.
 """
 
@@ -33,10 +32,13 @@ from tools.external.backends import (
 )
 from tools.external.base import AnalysisContext, ExternalAnalyzer, ProbeResult, RunOutcome
 from tools.external.firmrec.parser import parse_firmrec_output
-from tools.external.firmrec.vuln_info import stage_vuln_info
+from tools.external.firmrec.vuln_info import (
+    collect_our_vuln_info,
+    official_vuln_info_valid,
+    stage_vuln_info,
+)
 
 IMAGE = "xylearn/firmrec-base"
-CONTAINER_NAME = "firmrec-run"
 
 
 class FirmrecAnalyzer(ExternalAnalyzer):
@@ -48,10 +50,10 @@ class FirmrecAnalyzer(ExternalAnalyzer):
         cfg = config or {}
         self.image: str = cfg.get("image", IMAGE)
         self.vuln_info_source: str = str(cfg.get("vuln_info_source", "our"))
+        self.official_vuln_info_path: str = str(cfg.get("official_vuln_info_path", ""))
         self.mode: str = str(cfg.get("mode", "signature_only"))
         self.timeout_s: int = int(cfg.get("timeout_s", 7200))
         self.signature_db: str = str(cfg.get("signature_db", "./benchmarks/CVEs"))
-        self.sanitize_poc: bool = bool(cfg.get("sanitize_poc", True))
 
     # -- probe ------------------------------------------------------------- #
 
@@ -70,21 +72,28 @@ class FirmrecAnalyzer(ExternalAnalyzer):
                 notes=f"run: docker pull {self.image}",
             )
         missing: list[str] = []
-        if self.vuln_info_source == "our" and not Path(self.signature_db).exists():
-            missing.append(f"signature_db:{self.signature_db}")
-        if self.sanitize_poc:
-            try:
-                from tools.external.firmrec.sanitize import sanitize_poc  # noqa: F401
+        if self.vuln_info_source == "our":
+            signature_db = Path(self.signature_db)
+            if not signature_db.exists() or not collect_our_vuln_info(signature_db):
+                missing.append(f"signature_db-empty-or-missing:{self.signature_db}")
+        elif self.vuln_info_source == "official":
+            official = Path(self.official_vuln_info_path)
+            if not self.official_vuln_info_path or not official_vuln_info_valid(official):
+                missing.append("official_vuln_info_path")
+        elif self.vuln_info_source not in {"our", "official"}:
+            missing.append(f"unsupported-vuln-info-source:{self.vuln_info_source}")
+        try:
+            from tools.external.firmrec.sanitize import sanitize_poc  # noqa: F401
 
-                _ = sanitize_poc
-            except Exception:
-                missing.append("sanitizer:unavailable")
+            _ = sanitize_poc
+        except Exception:
+            missing.append("sanitizer:unavailable")
         return ProbeResult(
-            available=True,
+            available=not missing,
             version=self._image_version(),
             backend="docker",
             missing=missing,
-            notes=detail or "docker ok; PostgreSQL started via `make start` on the run host",
+            notes=detail or "docker image ready; PostgreSQL reachability is verified by the run",
         )
 
     def _image_version(self) -> str:
@@ -121,11 +130,12 @@ class FirmrecAnalyzer(ExternalAnalyzer):
             # Windows symlink may be blocked; fall back to a marker file.
             (fw_in / "rootfs.txt").write_text(str(rootfs), encoding="utf-8")
 
-        # 2) vuln_info: our 9-CVE knowledge base, or the official sample placeholder.
+        # 2) vuln_info: our 9-CVE knowledge base, or a configured real official file.
         stage_vuln_info(
             ctx.workdir,
             cve_root=self.signature_db if self.vuln_info_source == "our" else None,
             source=self.vuln_info_source,
+            official_path=self.official_vuln_info_path or None,
         )
 
         # 3) experiment.json: the task table (one firmware, full pipeline).
@@ -147,7 +157,7 @@ class FirmrecAnalyzer(ExternalAnalyzer):
         mounts = {ctx.workdir / "out": "/work/out", ctx.workdir / "inout": "/work/inout"}
         cmd = ["python", "-m", "firmrec.pipeline", "all"]
 
-        # Prefer an already-started container (PostgreSQL is up); else throwaway run.
+        # The configured image/environment must provide a reachable PostgreSQL service.
         res = run_docker(
             self.image,
             cmd,

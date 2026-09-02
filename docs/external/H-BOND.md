@@ -1,5 +1,7 @@
 # H 同学 · BOND 全量复现与集成计划
 
+> **当前实现状态（2026-09-02）**：本文件保留原始研发目标与论文对照；仓库产品路径采用安全子集 mini-BOND：可选真实 Ghidra headless、确定性约束/模板/种子调度、内置限界 HTTP 仿真探针。它不使用 BooFuzz 会话管理，不生成合成 CFG，不把模拟模式写成 finding，也不宣称与论文原型能力等价。实际行为以 `tools/external/bond/runner.py` 和 `benchmarks/external/bond/comparison.md` 为准。
+
 > **你的任务**：把 BOND（USENIX Sec'26，约束导向定向模糊测试）从"论文"做到
 > "能把我们的候选变成可触发证据的验证引擎"。
 > **Plan A（原版复现）与 Plan B（mini-BOND 自研）双线并行，Plan B 是主线。**

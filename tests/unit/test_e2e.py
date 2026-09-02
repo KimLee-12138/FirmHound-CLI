@@ -5,11 +5,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "fixtures"))
 
 from elf_builder import write_elf64  # noqa: E402
 
-from scripts.run_e2e import analyze_rootfs
+from scripts.run_e2e import analyze_rootfs, main
 
 
 def _make_rootfs(tmp_path: Path) -> Path:
@@ -40,9 +42,7 @@ def _make_rootfs(tmp_path: Path) -> Path:
 def test_analyze_detects_elf_command_injection(tmp_path: Path) -> None:
     rootfs = _make_rootfs(tmp_path)
     result = analyze_rootfs(rootfs)
-    elf_candidates = [
-        c for c in result["candidates"] if c["candidate_id"].startswith("e2e-elf-")
-    ]
+    elf_candidates = [c for c in result["candidates"] if c["candidate_id"].startswith("e2e-elf-")]
     assert elf_candidates, "expected an ELF command-injection candidate"
     cand = elf_candidates[0]
     assert cand["vuln_class_hypothesis"] == "command_injection"
@@ -53,9 +53,7 @@ def test_analyze_detects_elf_command_injection(tmp_path: Path) -> None:
 def test_analyze_detects_cgi_command_injection(tmp_path: Path) -> None:
     rootfs = _make_rootfs(tmp_path)
     result = analyze_rootfs(rootfs)
-    cgi_candidates = [
-        c for c in result["candidates"] if c["candidate_id"].startswith("e2e-cgi-")
-    ]
+    cgi_candidates = [c for c in result["candidates"] if c["candidate_id"].startswith("e2e-cgi-")]
     assert cgi_candidates, "expected a CGI command-injection candidate"
     assert cgi_candidates[0]["sink"]["function"] == "eval"
 
@@ -69,10 +67,15 @@ def test_analyze_reports_binaries_and_endpoints(tmp_path: Path) -> None:
 
 
 def test_analyze_missing_rootfs_raises(tmp_path: Path) -> None:
-    import pytest
-
     with pytest.raises(FileNotFoundError):
         analyze_rootfs(tmp_path / "does-not-exist")
+
+
+def test_legacy_entrypoint_requires_fixture_acknowledgement(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["run_e2e.py"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
 
 
 def test_analyze_skips_broken_symlinks(tmp_path: Path) -> None:

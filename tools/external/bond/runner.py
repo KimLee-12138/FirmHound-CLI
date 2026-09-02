@@ -2,9 +2,9 @@
 
 BOND (H-BOND.md) closes the gap between *suspected* and *confirmed* in our pipeline.
 It consumes the candidates that survived KLEE's symbolic pruning (``symex.reachable``
-== True) and tries to turn each into a real, triggerable PoC using mini-BOND
-(constraint extraction -> LLM template -> priority seed generation -> directed fuzz
-over an emulated target).
+== True), extracts constraints, schedules bounded probes and validates them against an
+explicitly authorized emulated HTTP target. A finding is confirmed only when the real
+response contains the configured marker.
 
 Safety model (H-BOND.md §5, non-negotiable):
   * The target MUST be ``emulation`` only. Before any network activity the four hard
@@ -14,35 +14,31 @@ Safety model (H-BOND.md §5, non-negotiable):
   * Every PoC that would be persisted passes :func:`tools.external.bond.sanitize.sanitize_poc`;
     a blocked payload is dropped (never written, never rendered).
 
-Backends: auto (wsl -> local -> docker) / wsl / local / docker. When BooFuzz / Ghidra /
-the emulator is absent, the stage degrades to ``skipped`` / honest ``limitation`` --
-it never aborts the pipeline.
+The mini implementation uses a built-in HTTP transport and can optionally consume a
+real Ghidra CFG/callgraph export. Missing Ghidra or an unreachable emulator is reported
+as an honest limitation; no synthetic graph or simulated finding enters the result.
 """
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import http.client
 import json
+import socket
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from tools.emulation.safety_gate import evaluate_gate
-from tools.external.backends import (
-    docker_available,
-    docker_image_exists,
-    run_local,
-    run_wsl,
-)
 from tools.external.base import AnalysisContext, ExternalAnalyzer, ProbeResult, RunOutcome
 from tools.external.bond.mini.constraint import extract_constraints
-from tools.external.bond.mini.ghidra_export import identify_entry_points
+from tools.external.bond.mini.ghidra_export import export_cfg_cg, identify_entry_points
 from tools.external.bond.mini.scheduler import generate_seeds
 from tools.external.bond.mini.template import generate_template
 from tools.external.bond.parser import parse_bond_output
-
-# Default Docker image bundling Ghidra + BooFuzz (H-BOND.md §3 / §4.1).
-IMAGE = "bond/mini:latest"
+from tools.external.bond.sanitize import sanitize_poc
 
 
 class BondAnalyzer(ExternalAnalyzer):
@@ -59,64 +55,42 @@ class BondAnalyzer(ExternalAnalyzer):
         self.local_lab: bool = bool(cfg.get("local_lab", True))
         self.baseline_ready: bool = bool(cfg.get("baseline_ready", False))
         # Fuzzing knobs.
-        self.backend: str = str(cfg.get("backend", "auto"))
-        self.image: str = str(cfg.get("image", IMAGE))
-        self.timeout_s: int = int(cfg.get("timeout_s", 600))
         self.max_seeds: int = int(cfg.get("max_seeds", 8))
         self.simulate: bool = bool(cfg.get("simulate", True))
-        self.ghidra: bool = bool(cfg.get("ghidra", False))
+        self.ghidra: bool = bool(cfg.get("use_ghidra", cfg.get("ghidra", False)))
+        self.target_port: int = int(cfg.get("target_port", 80))
+        self.request_timeout_s: float = float(cfg.get("request_timeout_s", 5.0))
+        self.trigger_marker: str = str(cfg.get("trigger_marker", ""))
+        self.probe_parameter: str = str(cfg.get("probe_parameter", ""))
+        self.probe_value: str = str(cfg.get("probe_value", "echo LAB_MARKER"))
 
     # -- probe ------------------------------------------------------------- #
 
     def probe(self) -> ProbeResult:
-        """Detect the fuzzing backend. Never raises."""
+        """Probe the built-in safe HTTP transport. Never claims simulation is real."""
         if self.target != "emulation":
             return ProbeResult(
-                available=False, backend="none",
+                available=False,
+                backend="none",
                 missing=["emulation-only"],
                 notes="BOND target must be 'emulation'; real-device fuzzing is forbidden",
             )
-        backend = self._resolve_backend()
-        if backend == "docker":
-            ok, detail = docker_available()
-            if not ok:
-                return ProbeResult(
-                    available=False, backend="docker",
-                    missing=["docker-daemon"], notes=detail)
-            if not docker_image_exists(self.image):
-                return ProbeResult(
-                    available=False, backend="docker",
-                    missing=[f"image:{self.image}"], notes=f"docker pull {self.image}",
-                )
-            return ProbeResult(available=True, version="bond/mini", backend="docker", notes=detail)
-        # wsl / local: BooFuzz presence is the availability signal.
-        probe_cmd = ["boofuzz", "--version"]
-        res = (run_wsl(probe_cmd, timeout=30.0) if backend == "wsl"
-               else run_local(probe_cmd, timeout=30.0))
-        if res.status == "missing":
+        if self.simulate:
             return ProbeResult(
-                available=False, backend=backend, missing=["boofuzz"],
-                notes="BooFuzz not found on backend; install boofuzz or use docker",
+                available=False,
+                backend="simulation-disabled",
+                missing=["simulation mode (set external.bond.simulate=false)"],
+                notes=(
+                    "simulation mode is a test fixture only and is excluded from "
+                    "production findings"
+                ),
             )
-        if res.status != "ok":
-            return ProbeResult(
-                available=False, backend=backend,
-                missing=["boofuzz"], notes=res.stderr[:160])
         return ProbeResult(
-            available=True, version="bond/mini", backend=backend,
-            notes=f"boofuzz via {backend}")
-
-    def _resolve_backend(self) -> str:
-        if self.backend in {"wsl", "local", "docker"}:
-            return self.backend
-        if run_wsl(["true"], timeout=10.0).status == "ok":
-            return "wsl"
-        if run_local(["boofuzz", "--version"], timeout=10.0).status == "ok":
-            return "local"
-        ok, _ = docker_available()
-        if ok and docker_image_exists(self.image):
-            return "docker"
-        return "local"
+            available=True,
+            version=_MINI_VERSION,
+            backend="builtin-safe-http",
+            notes="constraint scheduler with isolated HTTP transport",
+        )
 
     # -- safety gate ------------------------------------------------------- #
 
@@ -151,7 +125,9 @@ class BondAnalyzer(ExternalAnalyzer):
             sink = cand.get("sink") or {}
             candidate_map[f"cand-{i}"] = {
                 "binary_id": str(cand.get("binary_id") or "unknown"),
-                "vuln_class": str(cand.get("vuln_class") or "other"),
+                "vuln_class": str(
+                    cand.get("vuln_class") or cand.get("vuln_class_hypothesis") or "other"
+                ),
                 "sink": {
                     "function": str(sink.get("function") or cand.get("sink_func") or ""),
                     "addr": str(sink.get("addr") or ""),
@@ -167,13 +143,16 @@ class BondAnalyzer(ExternalAnalyzer):
         )
         # Record the chosen target posture for audit (IP redacted by the gate itself).
         (ctx.workdir / "target.json").write_text(
-            json.dumps({
-                "target": self.target,
-                "authorized": self.authorized,
-                "local_lab": self.local_lab,
-                "baseline_ready": self.baseline_ready,
-                "target_ip_set": bool(self.target_ip),
-            }, indent=2),
+            json.dumps(
+                {
+                    "target": self.target,
+                    "authorized": self.authorized,
+                    "local_lab": self.local_lab,
+                    "baseline_ready": self.baseline_ready,
+                    "target_ip_set": bool(self.target_ip),
+                },
+                indent=2,
+            ),
             encoding="utf-8",
         )
         return ctx.workdir
@@ -184,45 +163,98 @@ class BondAnalyzer(ExternalAnalyzer):
         started = time.time()
         candidate_map = self._load_candidate_map(ctx)
         if not candidate_map:
-            return RunOutcome(status="ok", duration_s=0.0, outputs=[],
-                              limitation="no candidates to validate with BOND")
+            return RunOutcome(
+                status="ok",
+                duration_s=0.0,
+                outputs=[],
+                limitation="no candidates to validate with BOND",
+            )
 
         # SAFETY GATE: evaluate before any network activity. A failing gate aborts
         # with ZERO outbound traffic (no Bond_result / fuzz_log are written).
         gate = self.check_safety()
         if not gate.allowed:
             return RunOutcome(
-                status="unsafe", duration_s=time.time() - started, outputs=[],
+                status="unsafe",
+                duration_s=time.time() - started,
+                outputs=[],
                 limitation=gate.reason or "ABORT_DYNAMIC_VALIDATION",
+            )
+        if self.simulate:
+            return RunOutcome(
+                status="skipped",
+                duration_s=time.time() - started,
+                outputs=[],
+                limitation="simulation mode does not emit production findings",
             )
 
         out_root = ctx.workdir / "out"
         out_root.mkdir(parents=True, exist_ok=True)
-        emulation_ok = self._emulation_reachable()
+        emulation_ok, reachability = self._emulation_reachable()
+        if not emulation_ok:
+            return RunOutcome(
+                status="skipped",
+                duration_s=time.time() - started,
+                outputs=[],
+                limitation=reachability,
+            )
 
+        triggered = 0
+        sent = 0
         for dir_name, candidate in candidate_map.items():
             cand_dir = out_root / dir_name
             cand_dir.mkdir(parents=True, exist_ok=True)
-            self._drive_one(cand_dir, candidate, emulation_ok)
+            metrics = self._drive_one(ctx, cand_dir, candidate)
+            triggered += int(metrics["triggered"])
+            sent += int(metrics["sent"])
 
         duration = time.time() - started
-        return RunOutcome(status="ok", duration_s=duration, outputs=[out_root])
+        limitation = "" if triggered else f"{sent} real probes sent; no trigger marker observed"
+        return RunOutcome(
+            status="ok",
+            duration_s=duration,
+            outputs=[out_root],
+            limitation=limitation,
+        )
 
-    def _drive_one(self, cand_dir: Path, candidate: dict[str, Any], emulation_ok: bool) -> None:
+    def _drive_one(
+        self,
+        ctx: AnalysisContext,
+        cand_dir: Path,
+        candidate: dict[str, Any],
+    ) -> dict[str, int]:
         """Run mini-BOND over one candidate and write BOND artifacts.
 
-        Honest: when no real emulator responds (``emulation_ok`` is False, the CI case)
-        we still emit the entry-point + constraint analysis but the fuzz log carries no
-        ``TRIGGERED`` marker -- the parser will report ``triggered=false`` (degrade, not
-        reject). We never fabricate a trigger.
+        This method runs only after the safety gate and reachability check. It records
+        only requests actually attempted, and never fabricates a trigger.
         """
         (cand_dir / "Bond_result" / "action_find").mkdir(parents=True, exist_ok=True)
         (cand_dir / "Bond_result" / "custom_analysis").mkdir(parents=True, exist_ok=True)
         (cand_dir / "fuzz_log").mkdir(parents=True, exist_ok=True)
 
-        # M1 entry point (uses a synthetic CFG from the candidate when Ghidra is off).
+        # M1 entry point: use a real Ghidra graph when enabled; otherwise retain only
+        # entry metadata already supported by upstream evidence.
         sink_addr = str(candidate.get("sink", {}).get("addr") or "")
-        entries = identify_entry_points(_cfg_from_candidate(candidate), sink_addr)
+        entries: list[dict[str, Any]] = []
+        ghidra_result: dict[str, Any] | None = None
+        if self.ghidra:
+            binary = (ctx.rootfs_dir / str(candidate.get("binary_id") or "")).resolve()
+            try:
+                binary.relative_to(ctx.rootfs_dir.resolve())
+            except ValueError:
+                ghidra_result = {
+                    "status": "failed",
+                    "available": False,
+                    "limitation": "candidate binary escapes the selected rootfs",
+                }
+            else:
+                graph_path = cand_dir / "Bond_result" / "action_find" / "cfg_cg.json"
+                ghidra_result = export_cfg_cg(binary, graph_path)
+                if ghidra_result.get("available"):
+                    entries = identify_entry_points(ghidra_result, sink_addr)
+            (cand_dir / "Bond_result" / "action_find" / "ghidra_status.json").write_text(
+                json.dumps(ghidra_result, indent=2), encoding="utf-8"
+            )
         default_ep = candidate.get("entry_point") or {"type": "unknown"}
         entry_point = entries[0] if entries else default_ep
         (cand_dir / "Bond_result" / "action_find" / "entry.json").write_text(
@@ -230,33 +262,118 @@ class BondAnalyzer(ExternalAnalyzer):
         )
 
         # M2 constraints
-        constraints = extract_constraints(candidate)
+        drive_candidate = dict(candidate)
+        drive_candidate["entry_point"] = entry_point
+        constraints = extract_constraints(drive_candidate)
         (cand_dir / "Bond_result" / "custom_analysis" / "constraints.json").write_text(
             json.dumps(constraints, indent=2), encoding="utf-8"
         )
 
         # M3 template + scheduler seeds
-        template = generate_template(candidate)
+        template = generate_template(drive_candidate)
         n_var = max(1, self.max_seeds // 3 or 1)
         seeds = generate_seeds(constraints, n_variants=n_var)
+        if self.probe_parameter and self.trigger_marker:
+            seeds.append(urlencode({self.probe_parameter: self.probe_value}))
         lines = [f"VERSION: BOND mini {_MINI_VERSION}"]
         method = template.get("method", "GET")
         ep = template.get("entry_point", "/")
+        sent = 0
+        triggered = 0
         for s in seeds:
-            lines.append(f"SENT: {method} {ep}?{s}")
-        if emulation_ok:
-            # A real emulator would set TRIGGERED here; CI has none, so we stay honest.
-            pass
+            probe = self._send_http_probe(str(method), str(ep), s)
+            if not probe.get("request"):
+                lines.append(f"ERROR: {probe.get('limitation', 'probe rejected')}")
+                continue
+            safe_request, safe = sanitize_poc(str(probe.get("request", "")))
+            if not safe:
+                lines.append("REJECTED: compliance sanitizer blocked generated request")
+                continue
+            sent += 1
+            lines.append(f"SENT: {safe_request}")
+            if probe["status"] == "timeout":
+                lines.append("TIMEOUT")
+            elif probe["status"] == "ok":
+                lines.append(
+                    f"RESPONSE: status={probe['http_status']} sha256={probe['response_sha256']}"
+                )
+            else:
+                lines.append(f"ERROR: {probe.get('limitation', 'probe failed')}")
+            if probe.get("triggered"):
+                triggered += 1
+                lines.append("TRIGGERED:marker")
+                break
         (cand_dir / "fuzz_log" / "fuzz_sent_log.txt").write_text(
-            "\n".join(lines) + "\n", encoding="utf-8")
+            "\n".join(lines) + "\n", encoding="utf-8"
+        )
+        return {"sent": sent, "triggered": triggered}
 
-    def _emulation_reachable(self) -> bool:
-        """True only when a real, private, baseline-ready emulator is configured.
+    def _emulation_reachable(self) -> tuple[bool, str]:
+        """Confirm a TCP listener exists after all safety gates have passed."""
+        if not self.target_ip or not 1 <= self.target_port <= 65535:
+            return False, "emulation target_ip/target_port is not configured"
+        try:
+            with socket.create_connection(
+                (self.target_ip, self.target_port), timeout=self.request_timeout_s
+            ):
+                return True, ""
+        except OSError as exc:
+            return False, f"emulation HTTP endpoint unreachable: {type(exc).__name__}"
 
-        In CI / on this host the emulator is not actually up, so this returns False and
-        BOND degrades honestly. Flip via config when a FirmAE/QEMU instance is live.
-        """
-        return bool(self.baseline_ready and self.target_ip and self.simulate is False)
+    def _send_http_probe(self, method: str, endpoint: str, seed: str) -> dict[str, Any]:
+        """Send one bounded request to the authorized private emulation endpoint."""
+        method = method.upper()
+        if method not in {"GET", "POST"}:
+            return {"status": "failed", "request": "", "limitation": "unsupported method"}
+        if "://" in endpoint or any(char in endpoint for char in ("\r", "\n", "\\")):
+            return {"status": "failed", "request": "", "limitation": "unsafe endpoint"}
+        endpoint_parts = urlsplit(endpoint)
+        if (
+            not endpoint_parts.path.startswith("/")
+            or endpoint_parts.netloc
+            or endpoint_parts.fragment
+        ):
+            return {"status": "failed", "request": "", "limitation": "unsafe endpoint"}
+        seed_params = parse_qsl(seed, keep_blank_values=True)
+        endpoint_params = parse_qsl(endpoint_parts.query, keep_blank_values=True)
+        if method == "GET":
+            query = urlencode([*endpoint_params, *seed_params])
+            path = endpoint_parts.path + (f"?{query}" if query else "")
+        else:
+            existing_query = urlencode(endpoint_params)
+            path = endpoint_parts.path + (f"?{existing_query}" if existing_query else "")
+        encoded = urlencode(seed_params)
+        body = encoded if method == "POST" else None
+        request_line = f"{method} {path}"
+        connection = http.client.HTTPConnection(
+            self.target_ip, self.target_port, timeout=self.request_timeout_s
+        )
+        try:
+            headers = (
+                {"Content-Type": "application/x-www-form-urlencoded"} if method == "POST" else {}
+            )
+            connection.request(method, path, body=body, headers=headers)
+            response = connection.getresponse()
+            response_body = response.read(4096)
+        except TimeoutError:
+            return {"status": "timeout", "request": request_line, "triggered": False}
+        except (OSError, http.client.HTTPException) as exc:
+            return {
+                "status": "failed",
+                "request": request_line,
+                "triggered": False,
+                "limitation": type(exc).__name__,
+            }
+        finally:
+            connection.close()
+        marker = self.trigger_marker.encode("utf-8") if self.trigger_marker else b""
+        return {
+            "status": "ok",
+            "request": request_line,
+            "http_status": response.status,
+            "response_sha256": hashlib.sha256(response_body).hexdigest(),
+            "triggered": bool(marker and marker in response_body),
+        }
 
     # -- parse ------------------------------------------------------------- #
 
@@ -296,27 +413,6 @@ def _klee_reachable(candidate: dict[str, Any]) -> bool:
         return True
     # also accept an explicit flag some callers set
     return bool(candidate.get("klee_reachable"))
-
-
-def _cfg_from_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
-    """Build a minimal CFG for entry-point identification from candidate metadata.
-
-    Real BOND would use Ghidra-exported CFG/CG; here we synthesise enough structure
-    (a dispatch node registering the handler, calling toward the sink) so the backward
-    traversal can still locate the entry point when Ghidra is unavailable.
-    """
-    sink_addr = str(candidate.get("sink", {}).get("addr") or "0xsink")
-    ep = candidate.get("entry_point") or {}
-    dispatch_func = str(ep.get("func") or "0xdispatch")
-    keyword = str(ep.get("keyword") or "handler")
-    sink_name = str(candidate.get("sink", {}).get("function") or "sink")
-    functions = {
-        dispatch_func: {"name": f"handle{keyword}",
-                        "strings": [f'websFormDefine("{keyword}", fn)']},
-        sink_addr: {"name": sink_name, "strings": []},
-    }
-    callgraph = {dispatch_func: [sink_addr]}
-    return {"functions": functions, "callgraph": callgraph}
 
 
 def build(config: dict[str, Any] | None = None) -> BondAnalyzer:

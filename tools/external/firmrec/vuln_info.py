@@ -20,6 +20,7 @@ never treat an inferred field as a verified fact.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -95,17 +96,30 @@ def collect_our_vuln_info(cve_root: str | Path) -> list[dict[str, Any]]:
     return records
 
 
+def official_vuln_info_valid(path: str | Path) -> bool:
+    """Return whether *path* is a non-empty FirmRec JSON-list signature file."""
+    candidate = Path(path)
+    if not candidate.is_file() or candidate.stat().st_size == 0:
+        return False
+    try:
+        data = json.loads(candidate.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(data, list) and bool(data)
+
+
 def stage_vuln_info(
     workdir: Path,
     *,
     cve_root: str | Path | None = None,
     source: str = "our",
+    official_path: str | Path | None = None,
 ) -> Path:
     """Write ``inout/vuln_info/vulns.json`` into the analyzer workdir.
 
-    ``source="our"`` uses our 9-CVE knowledge base; ``source="official"`` is a
-    placeholder path the student fills from the upstream FirmRec sample (the exact
-    upstream schema is copied after a successful official-sample run).
+    ``source="our"`` uses our 9-CVE knowledge base. ``source="official"`` copies
+    an explicitly configured, non-empty upstream JSON file. Missing official data
+    is an error rather than an empty database that could look like a clean result.
     """
     workdir = Path(workdir)
     out_dir = workdir / "inout" / "vuln_info"
@@ -113,12 +127,22 @@ def stage_vuln_info(
     out_path = out_dir / "vulns.json"
 
     if source == "official":
-        # Filled by the student after running the official FirmRec sample; until
-        # then we emit an empty-but-valid list so the pipeline does not crash.
-        out_path.write_text("[]", encoding="utf-8")
+        if not official_path:
+            raise ValueError("official FirmRec vuln_info path is not configured")
+        official = Path(official_path)
+        if not official_vuln_info_valid(official):
+            raise ValueError(
+                f"official FirmRec vuln_info must be a non-empty JSON list: {official}"
+            )
+        shutil.copyfile(official, out_path)
         return out_path
 
+    if source != "our":
+        raise ValueError(f"unsupported FirmRec vuln_info source: {source}")
+
     records = collect_our_vuln_info(cve_root) if cve_root else []
+    if not records:
+        raise ValueError("configured FirmRec signature database produced no records")
     out_path.write_text(json.dumps(records, indent=2, ensure_ascii=False), encoding="utf-8")
     return out_path
 
@@ -126,5 +150,6 @@ def stage_vuln_info(
 __all__ = [
     "cve_dir_to_vuln_info",
     "collect_our_vuln_info",
+    "official_vuln_info_valid",
     "stage_vuln_info",
 ]

@@ -61,6 +61,7 @@ class ParseStats:
 # low-level readers (tolerant, never raise)
 # --------------------------------------------------------------------------- #
 
+
 def _read_text(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8", errors="replace")
@@ -121,8 +122,12 @@ def _scan_fuzz_log(cand_dir: Path) -> tuple[list[str], dict[str, Any]]:
 # per-directory verdict
 # --------------------------------------------------------------------------- #
 
+
 def _validation_for(
-    sent: list[str], markers: dict[str, Any], stats: ParseStats, cand_dir: Path,
+    sent: list[str],
+    markers: dict[str, Any],
+    stats: ParseStats,
+    cand_dir: Path,
 ) -> dict[str, Any]:
     """Decide the validation verdict and the (sanitized) PoC for a candidate dir."""
     if markers.get("crash"):
@@ -148,17 +153,28 @@ def _validation_for(
         stats.dropped_unsafe += 1
         stats.note(
             f"{cand_dir.name}: PoC blocked by sanitizer "
-            "(command-execution primitive); finding dropped")
-        return {"triggered": triggered, "probe": probe, "poc_sanitized": False,
-                "poc": "", "limitation": "poc blocked by compliance sanitizer"}
+            "(command-execution primitive); finding dropped"
+        )
+        return {
+            "triggered": triggered,
+            "probe": probe,
+            "poc_sanitized": False,
+            "poc": "",
+            "limitation": "poc blocked by compliance sanitizer",
+        }
 
     limitation = ""
     if probe == "none":
         limitation = "bond: constrained fuzzing did not trigger; needs manual review (NEED_DYNAMIC)"
     elif probe == "timeout":
         limitation = "bond: fuzz timeout; feasibility undetermined"
-    return {"triggered": triggered, "probe": probe, "poc_sanitized": True,
-            "poc": poc_text, "limitation": limitation}
+    return {
+        "triggered": triggered,
+        "probe": probe,
+        "poc_sanitized": True,
+        "poc": poc_text,
+        "limitation": limitation,
+    }
 
 
 def _confidence_for(verdict: dict[str, Any]) -> float:
@@ -172,6 +188,7 @@ def _confidence_for(verdict: dict[str, Any]) -> float:
 # --------------------------------------------------------------------------- #
 # assembly
 # --------------------------------------------------------------------------- #
+
 
 def parse_bond_output(
     out_dir: Path,

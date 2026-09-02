@@ -2,8 +2,7 @@
 
 Every PoC that any external analyzer wants to persist or render into a report
 MUST pass through :func:`sanitize_poc`. This is the single compliance gate for
-"can this payload leave the lab". The contract is stable and identical to the
-placeholder F was using:
+"can this payload leave the lab". The stable contract is:
 
     sanitize_poc(raw: str, *, strict: bool = True) -> tuple[str, bool]
     # -> (sanitized_text, poc_sanitized)
@@ -76,6 +75,7 @@ def _is_dangerous(text: str) -> bool:
 def _redact(text: str) -> str:
     """Anonymise IPs / hosts and truncate overflow runs. Never raises."""
     out = text
+
     # redact IPv4 (skip the loopback / placeholder ranges already abstract)
     def _ip_sub(m: re.Match[str]) -> str:
         raw = m.group(0)

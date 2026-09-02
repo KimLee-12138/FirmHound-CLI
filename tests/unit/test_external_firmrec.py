@@ -9,18 +9,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from tools.external.firmrec.parser import (
     compute_confidence,
     parse_firmrec_output,
 )
 from tools.external.firmrec.sanitize import sanitize_poc
+from tools.external.firmrec.vuln_info import stage_vuln_info
 
 FIXTURES = (
-    Path(__file__).resolve().parent.parent.parent
-    / "tools"
-    / "external"
-    / "firmrec"
-    / "fixtures"
+    Path(__file__).resolve().parent.parent.parent / "tools" / "external" / "firmrec" / "fixtures"
 )
 # Abstract rootfs: FirmRec's binary ids are not real paths on this host.
 ROOTFS = Path("/tmp/fake_rootfs")
@@ -90,3 +89,33 @@ def test_sanitize_poc_rejects_reverse_shell_accepts_benign():
     assert ok_good is True
     _, ok_empty = sanitize_poc("")
     assert ok_empty is True
+
+
+def test_official_vuln_info_requires_a_real_file(tmp_path: Path):
+    with pytest.raises(ValueError, match="not configured"):
+        stage_vuln_info(tmp_path, source="official")
+
+
+def test_official_vuln_info_copies_configured_data(tmp_path: Path):
+    official = tmp_path / "upstream.json"
+    official.write_text('[{"cve_id":"CVE-TEST"}]', encoding="utf-8")
+
+    staged = stage_vuln_info(
+        tmp_path / "run",
+        source="official",
+        official_path=official,
+    )
+
+    assert staged.read_text(encoding="utf-8") == official.read_text(encoding="utf-8")
+
+
+def test_official_vuln_info_rejects_non_json_placeholder(tmp_path: Path):
+    official = tmp_path / "upstream.json"
+    official.write_text("placeholder", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="non-empty JSON list"):
+        stage_vuln_info(
+            tmp_path / "run",
+            source="official",
+            official_path=official,
+        )

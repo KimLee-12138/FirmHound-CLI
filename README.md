@@ -60,7 +60,7 @@
 | 🐾 全流程自动化 | M0–M14 模块化，阶段机驱动（`fsa/orchestrator/engine.py`），支持断点续跑 |
 | 🎯 零 CVE 先验 | 通用规则 + Skill 知识驱动，不硬编码 CVE 特征，适配现场新固件 |
 | 🐍 纯 Python 分析 | pyelftools + capstone 解析 ELF，Windows 可直跑，不强制依赖 Ghidra/objdump |
-| 🔌 双运行时 | `mock`（离线规则兜底） / `openai_compatible`（国内备案模型，`config/models.yaml` 一键切换） |
+| 🔌 双运行时 | `offline`（确定性离线规则，不生成模型结论） / `openai_compatible`（国内备案模型） |
 | 🛡️ 反证优先验证 | 10 问清单 + 12 条硬规则，五分类结论模型 |
 | 📊 十维风险评分 | P-I-U-D-C-S-W-K-V-T 十维、满分 30，阈值分级 CRITICAL/HIGH/MEDIUM/LOW |
 | 🔒 动态验证安全门 | 四项硬门（AUTHORIZED / LOCAL_LAB / PRIVATE_NETWORK / BASELINE_READY），仅无害探针 |
@@ -95,7 +95,7 @@ fsa analyze firmware_samples/router.bin --input-type firmware \
                     └───────────────┬──────────────────────────┘
                                     │ 统一 Runtime Adapter
                     ┌───────────────▼──────────────────────────┐
-                    │   fsa/runtime  mock │ openai_compatible  │
+                    │ fsa/runtime offline │ openai_compatible  │
                     │   SkillLoader / ToolRegistry / Budget     │
                     └───────────────┬──────────────────────────┘
         ┌───────────┬───────────────┼────────────────┬──────────┐
@@ -406,8 +406,8 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | `python scripts/dev.py ext-smoke` | 探测 SaTC/FirmRec/KLEE/BOND，可缺失降级 | JSONL 状态 |
 | `python scripts/dev.py lint` | ruff 代码检查 | — |
 | `python scripts/dev.py format` | 自动格式化 | — |
-| `python scripts/run_pipeline.py ...` | 旧金标准回归脚本（测试用途，不是产品 CLI） | fixture 回归产物 |
-| `python scripts/run_e2e.py ...` | 旧合成样本演练（测试用途，不代表真实主链） | 演练产物 |
+| `python scripts/run_pipeline.py --benchmark-fixtures ...` | 金标准回归脚本（必须显式确认 fixture 模式） | fixture 回归产物 |
+| `python scripts/run_e2e.py --fixture-mode ...` | 合成样本回归（必须显式确认 fixture 模式） | 演练产物 |
 | `python scripts/demo_rank.py ...` | 独立评分示例（测试用途） | 示例排序产物 |
 | `bash scripts/setup_wsl.sh`（WSL 内） | 一键装 Linux 工具链 | — |
 
@@ -416,7 +416,7 @@ qemu-mipsel-static -L tmp/squashfs-root tmp/squashfs-root/htdocs/fileaccess.cgi
 | 文件 | 作用 | 默认即用？ |
 |---|---|---|
 | `config/dev.yaml` | 主配置：runtime / 路径 / 日志 | ✅ |
-| `config/models.yaml` | 模型运行时（mock / openai_compatible）与预算 | ✅（mock 默认） |
+| `config/models.yaml` | 模型运行时（offline / openai_compatible）与预算 | ✅（offline 默认） |
 | `config/safety.yaml` | 安全红线（路径白名单 / 命令黑名单 / 网络白名单） | ✅（**不要改**） |
 | `.env` | 模型 API Key 等环境变量（参考 `.env.example`） | 可选 |
 
@@ -519,7 +519,7 @@ python scripts/dev.py lint    # ruff 全绿
 真实固件 rootfs 含 Linux 符号链接（如 `tmp -> /dev/null`），Windows 无法 stat。CLI 已做符号链接容错（`fsa/utils/traverse.py`），直接分析即可，无需手动清理。
 
 **Q3：怎么接入国产大模型？**
-编辑 `config/models.yaml` 的 `openai_compatible` 段，设置 `OPENAI_API_KEY` 环境变量，`config/dev.yaml` 的 `runtime.default` 改为 `openai_compatible`。模型不可用时自动回退 mock。
+编辑 `config/models.yaml` 的 `openai_compatible` 段，设置 `OPENAI_API_KEY` 环境变量，`config/dev.yaml` 的 `runtime.default` 改为 `openai_compatible`。模型不可用时只返回明确的 degraded 状态，不生成替代模型结论。
 
 **Q4：比赛现场给新固件，系统能发现漏洞吗？**
 能。系统不依赖 CVE 特征硬编码：`run_e2e.py` 演练证明零 CVE 先验可检出植入命令注入。现场流程 = 放置固件 → 解包 → 分析 → 人工审计 → 报告。

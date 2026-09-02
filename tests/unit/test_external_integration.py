@@ -14,7 +14,8 @@ from pathlib import Path
 import pytest
 
 from fsa.runtime.tool_registry import ToolRegistry
-from tools.external.adapter import _tool_cfg
+from fsa.utils.jsonio import save_json
+from tools.external.adapter import _resolve_rootfs, _tool_cfg
 from tools.external.run_all import run_all
 
 _EXPECTED_REGISTRY = [
@@ -107,3 +108,23 @@ def test_upstream_phase_excludes_downstream_tools(tmp_path):
     result = run_all(tmp_path, config_path=cfg_path, phase="upstream")
     assert result["status"] == "skipped"
     assert result["tools"] == []
+
+
+def test_rootfs_resolution_uses_unpack_descriptor(tmp_path):
+    run_dir = tmp_path / "runs" / "r1"
+    rootfs = tmp_path / "selected-rootfs"
+    rootfs.mkdir()
+    save_json(
+        run_dir / "artifacts" / "rootfs.json",
+        {"status": "ok", "rootfs_path": str(rootfs)},
+    )
+    assert _resolve_rootfs(run_dir, {}) == rootfs.resolve()
+
+
+def test_rootfs_resolution_never_guesses_another_run(tmp_path, monkeypatch):
+    guessed = tmp_path / "tmp" / "unpacked" / "old" / "squashfs-root"
+    guessed.mkdir(parents=True)
+    run_dir = tmp_path / "runs" / "new-run"
+    run_dir.mkdir(parents=True)
+    monkeypatch.chdir(tmp_path)
+    assert _resolve_rootfs(run_dir, {}) is None

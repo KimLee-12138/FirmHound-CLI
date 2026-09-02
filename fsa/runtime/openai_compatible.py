@@ -43,7 +43,7 @@ class OpenAICompatibleRuntime(AgentRuntime):
             return ModelReply(
                 content="Budget exhausted; switching to rule fallback.",
                 finish_reason="budget_exceeded",
-                metadata={"reviewer": "mock"},
+                metadata={"reviewer": "rule", "inference_performed": False},
             )
 
         try:
@@ -68,7 +68,11 @@ class OpenAICompatibleRuntime(AgentRuntime):
             return ModelReply(
                 content=f"Model call failed: {exc}",
                 finish_reason="error",
-                metadata={"reviewer": "mock", "error": str(exc)},
+                metadata={
+                    "reviewer": "rule",
+                    "inference_performed": False,
+                    "error": str(exc),
+                },
             )
 
     def run_skill(self, skill_name: str, context: dict[str, Any]) -> SkillResult:

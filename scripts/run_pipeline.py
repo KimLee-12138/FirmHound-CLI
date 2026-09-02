@@ -1,17 +1,16 @@
-"""End-to-end static-analysis pipeline demo.
+"""Synthetic benchmark runner for the deterministic scoring/verifier chain.
 
 Wires the M5→M6→M7 chain together:
 
     candidate → risk_score → rank → select_top → verify (10-question falsification)
               → verdicts → report
 
-Reads the CVE benchmark fixtures as its input (a stand-in for a real M5
-candidate set), runs scoring + ranking + verifier, and writes a human-readable
-Markdown report plus machine-readable JSON artifacts.
+Reads only the CVE benchmark fixtures, runs scoring + ranking + verifier, and writes
+a human-readable Markdown report plus machine-readable JSON artifacts.
 
 Usage::
 
-    python scripts/run_pipeline.py [--out-dir runs/pipeline]
+    python scripts/run_pipeline.py --benchmark-fixtures [--out-dir runs/pipeline]
 """
 
 from __future__ import annotations
@@ -242,7 +241,14 @@ def render_report(result: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the static-analysis pipeline demo.")
+    parser = argparse.ArgumentParser(
+        description="Run benchmark fixtures only; use `fsa analyze` for product analysis."
+    )
+    parser.add_argument(
+        "--benchmark-fixtures",
+        action="store_true",
+        help="Acknowledge this command processes known-CVE fixtures, not submitted firmware.",
+    )
     parser.add_argument("--out-dir", default=str(REPO_ROOT / "runs" / "pipeline"))
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--depth", choices=["standard", "full"], default="standard")
@@ -254,6 +260,10 @@ def main() -> int:
         help="Force recurrence-only tools out of benchmark results (default: true).",
     )
     args = parser.parse_args()
+    if not args.benchmark_fixtures:
+        parser.error(
+            "this is a benchmark-only harness; pass --benchmark-fixtures or use `fsa analyze`"
+        )
 
     candidates, attack_surface = load_benchmark()
     result = run_pipeline(

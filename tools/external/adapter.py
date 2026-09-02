@@ -116,9 +116,7 @@ def _tool_cfg(global_ext: dict[str, Any], tool: str) -> dict[str, Any]:
     cfg: dict[str, Any] = dict(global_ext.get(tool, {}) or {})
     # The top-level switch is a hard gate, not a default value.  A per-tool
     # switch must never bypass ``external.enabled=false``.
-    cfg["enabled"] = bool(global_ext.get("enabled", False)) and bool(
-        cfg.get("enabled", False)
-    )
+    cfg["enabled"] = bool(global_ext.get("enabled", False)) and bool(cfg.get("enabled", False))
     cfg.setdefault("workdir", global_ext.get("workdir", "./tmp/external"))
     cfg.setdefault("timeout_s", global_ext.get("timeout_s", 3600))
     return cfg
@@ -150,43 +148,29 @@ def _load_candidates(run_dir: Path) -> list[dict[str, Any]]:
 def _resolve_rootfs(run_dir: Path, cfg: dict[str, Any]) -> Path | None:
     """Locate the extracted firmware rootfs for a run.
 
-    Order: explicit config path -> ``<run_dir>/artifacts/rootfs`` ->
-    task_card firmware_path's extracted dir -> most recently modified
-    ``tmp/unpacked/*/squashfs-root``.
+    Order: explicit config path -> the UNPACK stage's immutable
+    ``artifacts/rootfs.json`` descriptor -> legacy in-run rootfs directory.
+    The resolver deliberately never guesses from a global ``tmp/unpacked`` directory,
+    because that can silently analyze a different run's firmware.
     """
     if cfg.get("rootfs_dir"):
         p = Path(str(cfg["rootfs_dir"]))
         if p.exists():
             return p
 
+    descriptor = run_dir / "artifacts" / "rootfs.json"
+    if descriptor.is_file():
+        try:
+            data = json.loads(descriptor.read_text(encoding="utf-8"))
+            selected = Path(str(data.get("rootfs_path") or ""))
+            if selected.is_dir():
+                return selected.resolve()
+        except (OSError, ValueError):
+            return None
+
     art_rootfs = run_dir / "artifacts" / "rootfs"
     if art_rootfs.exists():
-        return art_rootfs
-
-    tc = run_dir / "state" / "task_card.json"
-    if tc.exists():
-        try:
-            import json
-
-            card = json.loads(tc.read_text(encoding="utf-8"))
-            fw = card.get("firmware_path")
-            if fw and Path(str(fw)).exists():
-                extracted = Path(str(fw)).with_suffix("")  # naive: <fw>.extracted
-                cand = extracted / "squashfs-root"
-                if cand.exists():
-                    return cand
-        except Exception:
-            pass
-
-    tmp = Path("tmp/unpacked")
-    if tmp.exists():
-        roots = sorted(
-            tmp.rglob("squashfs-root"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if roots:
-            return roots[0]
+        return art_rootfs.resolve()
     return None
 
 

@@ -5,14 +5,15 @@ from __future__ import annotations
 import ipaddress
 import re
 
-# RFC 1918 + link-local + loopback + multicast
+# IPv4 ranges permitted for an isolated lab target. Multicast is deliberately
+# excluded: it is not a single controlled endpoint and must never pass a dynamic
+# validation safety gate.
 _PRIVATE_NETWORKS = [
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("224.0.0.0/4"),
 ]
 
 
@@ -22,8 +23,8 @@ def is_private_ip(addr: str) -> bool:
         ip = ipaddress.ip_address(addr)
     except ValueError:
         return False
-    if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_private:
-        return True
+    if ip.version != 4 or ip.is_multicast:
+        return False
     return any(ip in net for net in _PRIVATE_NETWORKS)
 
 

@@ -25,10 +25,11 @@ KLASS_ORDER: dict[str, int] = {"mandatory": 0, "partial": 1, "none": 2}
 
 _PARAM_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)")
 _STRING_EQ_RE = re.compile(
-    r'(?:deref|load|get)\s*\(\s*([^)]*?)\s*\)\s*==\s*["\']?([^"\']*?)["\']?\s*$', re.I)
+    r'(?:deref|load|get)\s*\(\s*([^)]*?)\s*\)\s*==\s*["\']?([^"\']*?)["\']?\s*$', re.I
+)
 _RANGE_RE = re.compile(r"[\[(]\s*[\d.]+\s*,\s*[\d.]+\s*[\])]")  # (0,1500] / [0,1500) / [1,2]
 _RANGE_SYMBOL_RE = re.compile(r"[∈E]\s*\(?[\d.,\s]+\)?", re.I)  # ∈(0,1500] / E(0,1500]
-_NULL_RE = re.compile(r'(\w+)\s*==\s*null|(\w+)\s*!=\s*null', re.I)
+_NULL_RE = re.compile(r"(\w+)\s*==\s*null|(\w+)\s*!=\s*null", re.I)
 
 
 def parse_constraint_expr(expr: str, param: str = "") -> dict[str, str]:
@@ -87,12 +88,14 @@ def extract_constraints(
         expr = str(item.get("expr") or item.get("constraint") or "")
         param = str(item.get("param") or _first_ident(expr) or "")
         parsed = parse_constraint_expr(expr, param)
-        out.append({
-            "param": param,
-            "semantic": str(item.get("semantic") or parsed["semantic"]),
-            "expr": expr,
-            "klass": str(item.get("klass") or parsed["klass"]),
-        })
+        out.append(
+            {
+                "param": param,
+                "semantic": str(item.get("semantic") or parsed["semantic"]),
+                "expr": expr,
+                "klass": str(item.get("klass") or parsed["klass"]),
+            }
+        )
     return out
 
 

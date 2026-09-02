@@ -160,7 +160,7 @@ python satc.py \
 | 09:00–11:00 | 写 `tools/external/satc/` 的 registry 声明；`scripts/run_external.py --tool satc` 跑通 |
 | 11:00–13:00 | 改 `fsa/orchestrator/engine.py`（Stage 枚举 + TRANSITIONS）与 `planner.py`（4 个新阶段，`required=False`） |
 | 13:00–15:00 | **写 `tools/analysis/finding_fusion.py` 骨架**（去重 + 交叉验证矩阵 + 证据合并），收 G/H 的需求 |
-| 15:00–17:00 | 全链路 `python scripts/run_pipeline.py --depth full --out-dir runs/ext_full` 跑通 |
+| 15:00–17:00 | fixture 回归链 `python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/ext_full` 跑通；真实输入使用 `fsa analyze` |
 | 17:00–18:00 | **8 种开关组合降级测试**（全关/逐个开/全开），确认不 abort |
 | **18:00** | **熔断评审**：按 §2 三档给自己定档 |
 

@@ -73,10 +73,10 @@ cat > "$WORK/rootfs/etc/init.d/rcS" << 'CEOF'
 CEOF
 chmod +x "$WORK/rootfs/etc/init.d/rcS"
 
-echo "[5/7] writing placeholders"
+echo "[5/7] writing synthetic fixture support files"
 echo "busybox" > "$WORK/rootfs/bin/busybox"
 echo "root:x:0:0:root:/root:/bin/sh" > "$WORK/rootfs/etc/passwd"
-echo "<html>demo router</html>" > "$WORK/rootfs/www/index.html"
+echo "<html>synthetic regression router</html>" > "$WORK/rootfs/www/index.html"
 
 echo "[6/7] packing squashfs firmware"
 mksquashfs "$WORK/rootfs" "$OUT/firmware.bin" -noappend -quiet

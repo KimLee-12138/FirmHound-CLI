@@ -2,9 +2,13 @@
 # 决赛环境：使用国内备案模型，OpenAI-compatible 端点。
 
 runtimes:
+  offline:
+    provider: offline_rule
+    description: Deterministic offline orchestration; never fabricates model output.
+
   mock:
     provider: mock
-    description: Rule-based offline runtime, no external calls.
+    description: Backward-compatible alias for the offline rule runtime (tests only).
 
   openai_compatible:
     provider: openai

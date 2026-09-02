@@ -42,7 +42,7 @@ python scripts/dev.py ext-smoke
 运行完整链：
 
 ```bash
-python scripts/run_pipeline.py --depth full --out-dir runs/ext_full
+python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/ext_full
 ```
 
 默认是 Blind Run。只有已获授权的复发扫描专项才可使用 `--no-blind`，并且必须在报告
@@ -55,7 +55,7 @@ python scripts/run_pipeline.py --depth full --out-dir runs/ext_full
 | SaTC | Docker、Ghidra、angr | skipped | 未跑真实镜像时不能声称完成跨函数实测 |
 | FirmRec | Docker、PostgreSQL、已知漏洞签名 | skipped/FORCED_DISABLE | 不能计入 Blind 指标 |
 | KLEE | LLVM bitcode、KLEE/Z3 | skipped/timeout | harness infeasible 不等于真实固件安全 |
-| mini-BOND | Ghidra/BooFuzz、QEMU/FirmAE、安全门 | skipped/unsafe | 模拟模式不能声称真实触发 |
+| mini-BOND | 可选 Ghidra、隔离仿真目标、安全门 | skipped/unsafe | 内置限界 HTTP 探针；模拟模式不生成 finding |
 
 当前仓库提供完整 Adapter、Parser、fixture、融合与降级测试；真实工具复现数据必须在
 对应 `benchmarks/external/<tool>/README.md` 中记录版本、镜像、commit、机器环境和耗时。

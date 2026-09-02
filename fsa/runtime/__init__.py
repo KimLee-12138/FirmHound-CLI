@@ -1,7 +1,7 @@
 """Agent Runtime adapters and tool registry."""
 
 from fsa.runtime.base import AgentRuntime, Budget, ModelReply, SkillResult, ToolResult
-from fsa.runtime.mock import MockRuntime
+from fsa.runtime.mock import MockRuntime, OfflineRuleRuntime
 from fsa.runtime.skill_loader import SkillLoader
 
 __all__ = [
@@ -11,6 +11,7 @@ __all__ = [
     "SkillResult",
     "ToolResult",
     "MockRuntime",
+    "OfflineRuleRuntime",
     "SkillLoader",
     "load_runtime",
 ]
@@ -31,8 +32,8 @@ def load_runtime(name: str, config: dict | None = None) -> AgentRuntime:
 
     runtime_cfg = runtimes[name]
     provider = runtime_cfg.get("provider")
-    if provider == "mock":
-        return MockRuntime(runtime_cfg)
+    if provider in {"mock", "offline_rule"}:
+        return OfflineRuleRuntime(runtime_cfg)
     if provider == "openai":
         from fsa.runtime.openai_compatible import OpenAICompatibleRuntime
 

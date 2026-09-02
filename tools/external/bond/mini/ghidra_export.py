@@ -15,12 +15,14 @@ reachable region.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import re
 import shutil
+import uuid
 from pathlib import Path
 from typing import Any
+
+from fsa.utils.proc import run_command
 
 # Dispatch-feature signatures that register a request handler (entry points).
 _DISPATCH_PATTERNS = [
@@ -76,12 +78,14 @@ def identify_entry_points(
             if _has_dispatch_feature(func):
                 # Extract the entry keyword: the dispatch string argument.
                 keyword = _extract_keyword(func)
-                results.append({
-                    "keyword": keyword,
-                    "func": caller,
-                    "type": _dispatch_type(func),
-                    "reachable_region": new_path,
-                })
+                results.append(
+                    {
+                        "keyword": keyword,
+                        "func": caller,
+                        "type": _dispatch_type(func),
+                        "reachable_region": new_path,
+                    }
+                )
             else:
                 queue.append((caller, new_path))
     return results
@@ -114,30 +118,111 @@ def export_cfg_cg(binary: Path, out_json: Path) -> dict[str, Any]:
     plus a ``limitation`` string; the caller must treat this as an honest skip (not a
     hard failure) -- the BOND stage then has no entry points to drive fuzzing with.
     """
-    ghidra = shutil.which("ghidra_headless") or shutil.which("analyzeHeadless")
+    binary = Path(binary).resolve()
+    out_json = Path(out_json).resolve()
+    if not binary.is_file():
+        return {
+            "status": "failed",
+            "available": False,
+            "binary": str(binary),
+            "functions": {},
+            "callgraph": {},
+            "limitation": "binary does not exist or is not a file",
+        }
+
+    ghidra = shutil.which("analyzeHeadless") or shutil.which("ghidra_headless")
     if ghidra is None:
         return {
+            "status": "degraded",
             "available": False,
             "binary": str(binary),
             "functions": {},
             "callgraph": {},
             "limitation": "ghidra headless not found on PATH; entry-point export skipped",
         }
-    # Real invocation would mount `binary` and run a Ghidra script; we record the
-    # intent and return an empty CFG (the student host runs the actual export).
-    with contextlib.suppress(OSError):
-        out_json.write_text(
-            json.dumps({"available": True, "binary": str(binary),
-                        "functions": {}, "callgraph": {}}, indent=2),
-            encoding="utf-8",
-        )
-    return {
-        "available": True,
-        "binary": str(binary),
-        "functions": {},
-        "callgraph": {},
-        "note": f"ghidra export placeholder (ran: {ghidra})",
-    }
+
+    script_dir = Path(__file__).resolve().parent.parent / "ghidra_scripts"
+    script_file = script_dir / "ExportCfgCg.java"
+    if not script_file.is_file():
+        return {
+            "status": "failed",
+            "available": False,
+            "binary": str(binary),
+            "functions": {},
+            "callgraph": {},
+            "limitation": f"Ghidra export script missing: {script_file}",
+        }
+
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    project_dir = out_json.parent / ".ghidra-projects"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    project_name = f"bond_{uuid.uuid4().hex[:12]}"
+    command = [
+        ghidra,
+        str(project_dir),
+        project_name,
+        "-import",
+        str(binary),
+        "-overwrite",
+        "-scriptPath",
+        str(script_dir),
+        "-postScript",
+        script_file.name,
+        str(out_json),
+        "-deleteProject",
+    ]
+    result = run_command(command, timeout=900)
+    if result.status != "success":
+        return {
+            "status": "degraded" if result.status == "timeout" else "failed",
+            "available": False,
+            "binary": str(binary),
+            "functions": {},
+            "callgraph": {},
+            "limitation": (
+                f"Ghidra export {result.status}: " f"{(result.stderr or result.stdout)[-500:]}"
+            ),
+        }
+    if not out_json.is_file():
+        return {
+            "status": "failed",
+            "available": False,
+            "binary": str(binary),
+            "functions": {},
+            "callgraph": {},
+            "limitation": "Ghidra completed without producing the requested JSON artifact",
+        }
+    try:
+        exported = json.loads(out_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "status": "failed",
+            "available": False,
+            "binary": str(binary),
+            "functions": {},
+            "callgraph": {},
+            "limitation": f"invalid Ghidra export JSON: {exc}",
+        }
+    if not isinstance(exported.get("functions"), dict) or not isinstance(
+        exported.get("callgraph"), dict
+    ):
+        return {
+            "status": "failed",
+            "available": False,
+            "binary": str(binary),
+            "functions": {},
+            "callgraph": {},
+            "limitation": "Ghidra export is missing functions/callgraph mappings",
+        }
+    exported.update(
+        {
+            "status": "ok",
+            "available": True,
+            "binary": str(binary),
+            "artifact": str(out_json),
+        }
+    )
+    return exported
 
 
 __all__ = ["export_cfg_cg", "identify_entry_points"]

@@ -9,7 +9,7 @@
 机器前置（与 H8 一致）：
 
 1. `config/dev.yaml`：`bond.enabled=true`，`authorized/local_lab/baseline_ready=true`，`simulate=false`，`target_ip=192.168.x.x`（私有）。
-2. `backend=wsl` 或 `docker`（`bond/mini:latest` 含 boofuzz + ghidra-headless）。
+2. 启动隔离仿真 HTTP 服务；可选安装 Ghidra headless 并配置 `use_ghidra=true`。
 3. 跑 `python scripts/run_external.py --tool bond --run-dir <dir>`。
 
-> 本目录当前为空，属**诚实降级**：代码与契约就绪，真实 fuzz 因本机环境（Docker 共享坏、无真机/仿真器）未能执行。
+> 本目录当前为空，属**诚实降级**：代码与契约就绪，但尚未保存一次授权仿真运行的真实产物。
