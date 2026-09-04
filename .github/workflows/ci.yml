@@ -34,7 +34,7 @@ jobs:
       - name: External adapter probe (missing tools degrade)
         run: python scripts/dev.py ext-smoke
       - name: Full-depth no-tool regression
-        run: python scripts/run_pipeline.py --depth full --out-dir runs/ci-full
+        run: python scripts/run_pipeline.py --benchmark-fixtures --depth full --out-dir runs/ci-full
       - name: Verify full-depth artifacts
         run: |
           test -f runs/ci-full/ranking.json
