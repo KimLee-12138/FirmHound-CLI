@@ -2,13 +2,14 @@
 
 Covers HarnessSpec -> C generation for command-injection / overflow, buffer-size
 handling, missing-data defaults, and candidate extraction. The *real KLEE* run
-(the ``@pytest.mark.slow`` compile test) is skipped in CI unless clang is present
+(the ``@pytest.mark.slow`` compile test) is skipped unless clang and KLEE headers are present
 (G-KLEE.md §7.2 CI constraint).
 """
 
 from __future__ import annotations
 
 import shutil
+import subprocess
 
 import pytest
 
@@ -90,6 +91,16 @@ def test_compile_to_bc_with_real_clang(tmp_path):
     clang = shutil.which("clang-16") or shutil.which("clang")
     if clang is None:
         pytest.skip("clang not installed; KLEE bitcode compile requires LLVM")
+    header_probe = subprocess.run(
+        [clang, "-E", "-x", "c", "-"],
+        input="#include <klee/klee.h>\n",
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    if header_probe.returncode != 0:
+        pytest.skip("KLEE headers not installed; bitcode compile requires klee/klee.h")
     spec = HarnessSpec(
         func_name="formexeCommand", sink_func="system", vuln_class="command_injection"
     )
